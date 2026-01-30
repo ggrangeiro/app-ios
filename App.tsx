@@ -40,7 +40,7 @@ import EvolutionPhotosModal from './components/EvolutionPhotosModal';
 import { AchievementsModal } from './components/AchievementsModal';
 import { Camera, ClipboardList, PlayCircle, Trophy } from 'lucide-react';
 import { getFullImageUrl } from './utils/imageUtils';
-import { WorkoutSession } from './components/WorkoutSession';
+import { WorkoutSession, WorkoutDaySelector } from './components/WorkoutSession';
 import { getCurrentLocation } from './utils/geolocation';
 
 // --- ICON MAPPING SYSTEM ---
@@ -462,6 +462,7 @@ const App: React.FC = () => {
   const [showAchievements, setShowAchievements] = useState(false);
   // Interactive Workout Session State
   const [activeWorkoutDay, setActiveWorkoutDay] = useState<WorkoutDayV2 | null>(null);
+  const [showDaySelector, setShowDaySelector] = useState(false);
 
   const handleStartSession = async (day: WorkoutDayV2) => {
     if (currentUser) {
@@ -2031,12 +2032,29 @@ const App: React.FC = () => {
       <div className="min-h-screen p-4 md:p-8 relative" style={{ paddingTop: 'max(4rem, env(safe-area-inset-top))' }}>
         <div className="flex justify-between items-center max-w-7xl mx-auto mb-6">
           <button
-            onClick={() => { setShowWorkoutModal(false); setViewingWorkoutHtml(null); setViewingDaysData(null); resetWorkoutForm(); }}
+            onClick={() => {
+              if (showDaySelector) {
+                setShowDaySelector(false);
+              } else {
+                setShowWorkoutModal(false);
+                setViewingWorkoutHtml(null);
+                setViewingDaysData(null);
+                resetWorkoutForm();
+              }
+            }}
             className="flex items-center gap-2 text-slate-300 hover:text-white transition-colors"
           >
             <ArrowLeft className="w-5 h-5" /> <span className="hidden sm:inline">Voltar</span>
           </button>
           <div className="flex gap-3">
+            {!showDaySelector && (savedWorkouts.length > 0) && (
+              <button
+                onClick={() => setShowDaySelector(true)}
+                className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 rounded-lg text-white font-bold shadow-lg shadow-purple-900/20 transition-all scale-100 hover:scale-105 active:scale-95"
+              >
+                <Dumbbell className="w-5 h-5" /> <span>Iniciar Treino</span>
+              </button>
+            )}
             <button
               onClick={() => handleSharePdf('workout-view-content', 'Meu Treino FitAI')}
               disabled={pdfLoading}
@@ -2102,42 +2120,7 @@ const App: React.FC = () => {
               );
             }
 
-            if (activeDaysData) {
-              try {
-                const rawParsed: any = JSON.parse(activeDaysData);
-                // Handle both formats: { days: [...] } or direct array
-                const parsedDays = Array.isArray(rawParsed) ? rawParsed : (rawParsed.days || []);
-                return (
-                  <div className="mb-8 grid gap-4 grid-cols-1 md:grid-cols-2 animate-in fade-in slide-in-from-top-4">
-                    {parsedDays.map((day: any, idx: number) => {
-                      // Support both formats: { name, status } and { dayLabel, trainingType, isRestDay }
-                      const isRest = day.status === 'rest' || day.isRestDay || day.is_rest_day;
-                      const title = day.name || day.trainingType || day.training_type || day.dayLabel || day.day_label || `Dia ${idx + 1}`;
-                      return (
-                        <div key={idx} className={`p-4 rounded-2xl border flex items-center justify-between ${isRest ? 'bg-slate-200 border-slate-300 opacity-75' : 'bg-white border-slate-200 shadow-sm transition-all hover:shadow-md'}`}>
-                          <div>
-                            <h4 className="font-bold text-slate-800">{title}</h4>
-                          </div>
-                          {!isRest && (
-                            <button
-                              onClick={() => handleStartSession({ ...day, _dayIndex: idx + 1 })}
-                              className="bg-emerald-600 hover:bg-emerald-500 text-white px-4 py-2 rounded-xl text-sm font-bold flex items-center gap-2 transition-colors shadow-emerald-900/20 shadow-lg active:scale-95"
-                            >
-                              <PlayCircle size={18} /> Iniciar
-                            </button>
-                          )}
-                          {isRest && <span className="text-xs font-bold px-2 py-1 bg-slate-300 text-slate-600 rounded">DESCANSO</span>}
-                        </div>
-                      );
-                    })}
-                  </div>
-                );
-              } catch (e) {
-                console.warn('Failed to parse daysData', e);
-                return null;
-              }
-            }
-            return null;
+return null;
           })()}
           <style>{`
                  #workout-view-content { font-family: 'Plus Jakarta Sans', sans-serif; color: #1e293b; }
@@ -2180,6 +2163,48 @@ const App: React.FC = () => {
           </div>
         </div>
       )}
+      {/* Modal de Seleção de Dia de Treino */}
+      {showDaySelector && (() => {
+        const currentWorkout = savedWorkouts[0];
+        const embeddedJson = currentWorkout?.content?.match(/<!-- DATA_JSON_START -->([\s\S]*?)<!-- DATA_JSON_END -->/)?.[1];
+        const activeDaysData = viewingDaysData || currentWorkout?.daysData || currentWorkout?.days_data || embeddedJson;
+
+        console.log('[DaySelector] currentWorkout:', currentWorkout);
+        console.log('[DaySelector] activeDaysData source:', {
+          viewingDaysData: !!viewingDaysData,
+          daysData: !!currentWorkout?.daysData,
+          days_data: !!currentWorkout?.days_data,
+          embeddedJson: !!embeddedJson
+        });
+
+        if (!activeDaysData) {
+          console.warn('[DaySelector] No activeDaysData found!');
+          return null;
+        }
+
+        try {
+          const rawParsed: any = JSON.parse(activeDaysData);
+          const parsedDays = Array.isArray(rawParsed) ? rawParsed : (rawParsed.days || []);
+
+          console.log('[DaySelector] rawParsed:', rawParsed);
+          console.log('[DaySelector] parsedDays:', parsedDays);
+          console.log('[DaySelector] parsedDays sample:', parsedDays[0]);
+
+          return (
+            <WorkoutDaySelector
+              days={parsedDays}
+              onSelectDay={(day, dayIndex) => {
+                handleStartSession({ ...day, _dayIndex: dayIndex });
+                setShowDaySelector(false);
+              }}
+              onClose={() => setShowDaySelector(false)}
+            />
+          );
+        } catch (e) {
+          console.warn('Failed to parse daysData for selector', e);
+          return null;
+        }
+      })()}
     </div>
   );
 
