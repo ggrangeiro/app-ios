@@ -200,8 +200,8 @@ export const CreditsModal: React.FC<BuyCreditsModalProps> = ({ isOpen, onClose, 
                             {isIOS ? (
                                 <div className="w-full text-center mt-4">
                                     <div className="flex items-center justify-center gap-2 text-sm text-slate-400 bg-slate-800/50 p-4 rounded-xl border border-slate-700">
-                                        <AlertCircle className="w-5 h-5 text-amber-400" />
-                                        <span>Para comprar créditos, acesse <strong className="text-white">fitanalizer.com.br</strong> pelo navegador.</span>
+                                        <AlertCircle className="w-5 h-5 text-blue-400" />
+                                        <span>Gestão de créditos disponível na versão Web.</span>
                                     </div>
                                 </div>
                             ) : (
