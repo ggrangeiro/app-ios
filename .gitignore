@@ -25,3 +25,15 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# iOS specific
+ios/App/Pods/
+ios/App/App.xcworkspace/xcuserdata/
+ios/App/App.xcodeproj/xcuserdata/
+ios/App/App.xcodeproj/project.xcworkspace/xcuserdata/
+*.xcuserstate
+DerivedData/
+
+# Build outputs
+build/
+*.ipa
