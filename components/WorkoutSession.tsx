@@ -110,11 +110,26 @@ const formatDayTitle = (day: any, index: number): string => {
 
 export const WorkoutDaySelector: React.FC<WorkoutDaySelectorProps> = ({ days, onSelectDay, onClose }) => {
     // Filtrar apenas dias de treino (remover dias de descanso)
-    const trainingDays = days.filter((day: any) => !isRestDay(day));
+    const nonRestDays = days.filter((day: any) => !isRestDay(day));
+
+    // Remover duplicatas baseado em day + title (para evitar dados duplicados da API)
+    const seenKeys = new Set<string>();
+    const trainingDays = nonRestDays.filter((day: any) => {
+        const dayName = day.day || day.dayLabel || day.day_label || '';
+        const title = day.title || day.trainingType || day.training_type || '';
+        const uniqueKey = `${dayName}::${title}`.toLowerCase();
+
+        if (seenKeys.has(uniqueKey)) {
+            return false; // Duplicata, ignorar
+        }
+        seenKeys.add(uniqueKey);
+        return true;
+    });
 
     // Debug: log dos dias recebidos
     console.log('[WorkoutDaySelector] Dias recebidos:', days);
-    console.log('[WorkoutDaySelector] Dias de treino (filtrados):', trainingDays);
+    console.log('[WorkoutDaySelector] Dias sem descanso:', nonRestDays);
+    console.log('[WorkoutDaySelector] Dias de treino (sem duplicatas):', trainingDays);
 
     return (
         <div className="fixed inset-0 z-[150] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-in fade-in">

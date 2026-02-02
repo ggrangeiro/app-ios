@@ -42,6 +42,8 @@ import { Camera, ClipboardList, PlayCircle, Trophy } from 'lucide-react';
 import { getFullImageUrl } from './utils/imageUtils';
 import { WorkoutSession, WorkoutDaySelector } from './components/WorkoutSession';
 import { getCurrentLocation } from './utils/geolocation';
+import { useAppState } from './hooks/useAppState';
+import { pendingOperations, PendingOperation } from './utils/pendingOperations';
 
 // --- ICON MAPPING SYSTEM ---
 const EXERCISE_ICONS: Record<string, React.ReactNode> = {
@@ -460,6 +462,14 @@ const App: React.FC = () => {
   const [checkInComment, setCheckInComment] = useState('');
   const [checkInLoading, setCheckInLoading] = useState(false);
   const [showAchievements, setShowAchievements] = useState(false);
+
+  // --- APP STATE RECOVERY (Background/Foreground) ---
+  const { isActive, onResume } = useAppState();
+  const workoutGenerationRef = useRef<{ operationId: string | null; abortController: AbortController | null }>({
+    operationId: null,
+    abortController: null
+  });
+
   // Interactive Workout Session State
   const [activeWorkoutDay, setActiveWorkoutDay] = useState<WorkoutDayV2 | null>(null);
   const [showDaySelector, setShowDaySelector] = useState(false);
@@ -907,6 +917,95 @@ const App: React.FC = () => {
   const closeToast = () => {
     setToast(prev => ({ ...prev, isVisible: false }));
   };
+
+  // --- APP STATE RECOVERY: When returning from background ---
+  useEffect(() => {
+    const unsubscribe = onResume(async (isNowActive, backgroundDurationMs) => {
+      if (!isNowActive || !currentUser) return;
+
+      console.log(`[AppStateRecovery] App resumed after ${backgroundDurationMs}ms in background`);
+
+      // Clean expired operations (older than 5 minutes)
+      pendingOperations.cleanExpired(5 * 60 * 1000);
+
+      // Check for pending workout generation
+      if (generatingWorkout) {
+        const pendingWorkoutOps = pendingOperations.getByType('WORKOUT_GENERATION');
+        const userPending = pendingWorkoutOps.find(op => op.userId === currentUser.id);
+
+        if (userPending) {
+          // Check if workout was created on backend during background
+          try {
+            const trainings = await apiService.getTrainings(currentUser.id);
+            const recentTraining = trainings.find((t: any) =>
+              t.id && (Date.now() - new Date(t.createdAt || t.data).getTime()) < 5 * 60 * 1000
+            );
+
+            if (recentTraining) {
+              // Workout was created! Update UI accordingly
+              console.log('[AppStateRecovery] Found recently created workout, syncing UI...');
+              setSavedWorkouts(trainings);
+              setViewingWorkoutHtml(recentTraining.content);
+              setViewingDaysData(recentTraining.daysData || null);
+              setShowWorkoutModal(true);
+              setShowGenerateWorkoutForm(false);
+              showToast("✅ Treino gerado com sucesso!", 'success');
+              pendingOperations.remove(userPending.id);
+              setGeneratingWorkout(false);
+            } else if (backgroundDurationMs > 2 * 60 * 1000) {
+              // If more than 2 minutes passed and no workout found, assume it failed
+              console.log('[AppStateRecovery] Workout generation likely failed/timed out');
+              showToast("⚠️ A geração pode ter sido interrompida. Tente novamente.", 'info');
+              pendingOperations.remove(userPending.id);
+              setGeneratingWorkout(false);
+            }
+            // If under 2 minutes, leave the loading state - it may still be processing
+          } catch (e) {
+            console.error('[AppStateRecovery] Error checking workout status:', e);
+          }
+        } else {
+          // No pending operation but state is loading - reset
+          setGeneratingWorkout(false);
+        }
+      }
+
+      // Check for pending diet generation
+      if (generatingDiet) {
+        const pendingDietOps = pendingOperations.getByType('DIET_GENERATION');
+        const userPending = pendingDietOps.find(op => op.userId === currentUser.id);
+
+        if (userPending) {
+          try {
+            const diets = await apiService.getDiets(currentUser.id);
+            const recentDiet = diets.find((d: any) =>
+              d.id && (Date.now() - new Date(d.createdAt || d.data).getTime()) < 5 * 60 * 1000
+            );
+
+            if (recentDiet) {
+              console.log('[AppStateRecovery] Found recently created diet, syncing UI...');
+              setSavedDiets(diets);
+              setViewingDietHtml(recentDiet.content);
+              setShowDietModal(true);
+              setShowGenerateDietForm(false);
+              showToast("✅ Dieta gerada com sucesso!", 'success');
+              pendingOperations.remove(userPending.id);
+              setGeneratingDiet(false);
+            } else if (backgroundDurationMs > 2 * 60 * 1000) {
+              showToast("⚠️ A geração pode ter sido interrompida. Tente novamente.", 'info');
+              pendingOperations.remove(userPending.id);
+              setGeneratingDiet(false);
+            }
+          } catch (e) {
+            console.error('[AppStateRecovery] Error checking diet status:', e);
+          }
+        } else {
+          setGeneratingDiet(false);
+        }
+      }
+    });
+
+    return unsubscribe;
+  }, [currentUser, generatingWorkout, generatingDiet, onResume]);
 
   const triggerConfirm = (title: string, message: string, onConfirm: () => void, isDestructive = false) => {
     setConfirmModal({
@@ -1659,6 +1758,15 @@ const App: React.FC = () => {
     if (!currentUser) return;
 
     setGeneratingWorkout(true);
+
+    // --- BACKGROUND RECOVERY: Save pending operation before starting ---
+    const pendingOp = pendingOperations.save({
+      type: 'WORKOUT_GENERATION',
+      userId: currentUser.id,
+      metadata: { goal: workoutFormData.goal }
+    });
+    workoutGenerationRef.current.operationId = pendingOp.id;
+
     try {
       const planHtml = await generateWorkoutPlan(
         { ...workoutFormData, anamnesis: currentUser.anamnesis },
@@ -1733,10 +1841,16 @@ const App: React.FC = () => {
       setViewingDaysData(daysDataStr || null); // Set immediate V2 data
       setShowWorkoutModal(true);
 
+      // --- BACKGROUND RECOVERY: Remove pending operation on success ---
+      pendingOperations.remove(pendingOp.id);
+
     } catch (err: any) {
       showToast("Erro ao gerar treino: " + err.message, 'error');
+      // --- BACKGROUND RECOVERY: Remove pending operation on error ---
+      pendingOperations.remove(pendingOp.id);
     } finally {
       setGeneratingWorkout(false);
+      workoutGenerationRef.current.operationId = null;
     }
   };
 
@@ -1745,6 +1859,14 @@ const App: React.FC = () => {
     if (!currentUser) return;
 
     setGeneratingDiet(true);
+
+    // --- BACKGROUND RECOVERY: Save pending operation before starting ---
+    const pendingOp = pendingOperations.save({
+      type: 'DIET_GENERATION',
+      userId: currentUser.id,
+      metadata: { goal: dietFormData.goal }
+    });
+
     try {
       // 1. Buscar treino ativo para dar contexto
       let workoutContext = "";
@@ -1813,8 +1935,13 @@ const App: React.FC = () => {
       setViewingDietHtml(planHtml);
       setShowDietModal(true);
 
+      // --- BACKGROUND RECOVERY: Remove pending operation on success ---
+      pendingOperations.remove(pendingOp.id);
+
     } catch (err: any) {
       showToast("Erro ao gerar dieta: " + err.message, 'error');
+      // --- BACKGROUND RECOVERY: Remove pending operation on error ---
+      pendingOperations.remove(pendingOp.id);
     } finally {
       setGeneratingDiet(false);
     }
@@ -2120,7 +2247,7 @@ const App: React.FC = () => {
               );
             }
 
-return null;
+            return null;
           })()}
           <style>{`
                  #workout-view-content { font-family: 'Plus Jakarta Sans', sans-serif; color: #1e293b; }
@@ -2167,14 +2294,33 @@ return null;
       {showDaySelector && (() => {
         const currentWorkout = savedWorkouts[0];
         const embeddedJson = currentWorkout?.content?.match(/<!-- DATA_JSON_START -->([\s\S]*?)<!-- DATA_JSON_END -->/)?.[1];
-        const activeDaysData = viewingDaysData || currentWorkout?.daysData || currentWorkout?.days_data || embeddedJson;
+
+        // Helper to check if daysData is corrupted (has duplicates)
+        const isDaysDataCorrupted = (jsonStr: string | undefined): boolean => {
+          if (!jsonStr) return false;
+          try {
+            const parsed = JSON.parse(jsonStr);
+            const days = Array.isArray(parsed) ? parsed : (parsed.days || []);
+            if (days.length <= 1) return false;
+            // Check if all days have the same day+title (corrupted duplicates)
+            const firstKey = `${days[0]?.day || ''}::${days[0]?.title || ''}`.toLowerCase();
+            return days.every((d: any) => `${d?.day || ''}::${d?.title || ''}`.toLowerCase() === firstKey);
+          } catch { return false; }
+        };
+
+        // Prefer embeddedJson if daysData appears corrupted with duplicates
+        const rawDaysData = viewingDaysData || currentWorkout?.daysData || currentWorkout?.days_data;
+        const activeDaysData = (rawDaysData && !isDaysDataCorrupted(rawDaysData))
+          ? rawDaysData
+          : (embeddedJson || rawDaysData);
 
         console.log('[DaySelector] currentWorkout:', currentWorkout);
         console.log('[DaySelector] activeDaysData source:', {
           viewingDaysData: !!viewingDaysData,
           daysData: !!currentWorkout?.daysData,
           days_data: !!currentWorkout?.days_data,
-          embeddedJson: !!embeddedJson
+          embeddedJson: !!embeddedJson,
+          isDaysDataCorrupted: isDaysDataCorrupted(rawDaysData)
         });
 
         if (!activeDaysData) {

@@ -20,6 +20,8 @@ interface PlansModalProps {
     isOpen: boolean;
     onClose: () => void;
     onSubscribe: (planId: string, planName: string, price: string) => void;
+    userId?: string | number; // Added for potential future use or analytics
+    currentUser?: any; // Added to match usage in App.tsx
 }
 
 const PLANS: PlanData[] = [
@@ -120,7 +122,7 @@ const PlansModal: React.FC<PlansModalProps> = ({ isOpen, onClose, onSubscribe })
                 <div className="relative p-6 border-b border-slate-100 flex items-center justify-between bg-gradient-to-r from-slate-50 to-white">
                     <div>
                         <h2 className="text-xl font-bold text-slate-900 flex items-center gap-2">
-                            Escolha seu Planos <Star className="w-5 h-5 text-amber-500 fill-amber-500" />
+                            Escolha seu Plano <Star className="w-5 h-5 text-amber-500 fill-amber-500" />
                         </h2>
                         <p className="text-sm text-slate-500">Evolua sua performance com IA</p>
                     </div>
@@ -134,6 +136,20 @@ const PlansModal: React.FC<PlansModalProps> = ({ isOpen, onClose, onSubscribe })
 
                 {/* Plan Cards Grid */}
                 <div className="p-6 overflow-y-auto" style={{ maxHeight: 'calc(95vh - 160px)' }}>
+
+                    {/* iOS Warning (Temporary until Native Payment) */}
+                    {isIOS && (
+                        <div className="mb-6 p-4 bg-slate-50 border border-slate-200 rounded-2xl flex flex-col items-center text-center gap-2">
+                            <AlertCircle className="w-6 h-6 text-amber-500" />
+                            <p className="text-sm text-slate-600">
+                                Para assinar, acesse <strong className="text-slate-900">fitanalizer.com.br/planos</strong> pelo navegador.
+                            </p>
+                            <p className="text-xs text-slate-400">
+                                A compra via app estará disponível em breve.
+                            </p>
+                        </div>
+                    )}
+
                     <div className="grid grid-cols-3 gap-3 mb-8">
                         {PLANS.map((plan, idx) => {
                             const isSelected = selectedPlanIdx === idx;
@@ -203,15 +219,8 @@ const PlansModal: React.FC<PlansModalProps> = ({ isOpen, onClose, onSubscribe })
                         </div>
                     </div>
 
-                    {/* Action Button */}
-                    {isIOS ? (
-                        <div className="w-full text-center">
-                            <div className="flex items-center justify-center gap-2 text-sm text-slate-500 bg-slate-100 p-4 rounded-xl border border-slate-200">
-                                <AlertCircle className="w-5 h-5 text-amber-500" />
-                                <span>Para assinar, acesse <strong className="text-slate-700">fitanalizer.com.br/planos</strong> pelo navegador.</span>
-                            </div>
-                        </div>
-                    ) : (
+                    {/* Action Button - Only enabled for Android/Web or if we want to allow generic flow */}
+                    {!isIOS ? (
                         <>
                             <button
                                 onClick={() => onSubscribe(currentPlan.id, currentPlan.name, currentPlan.price)}
@@ -225,6 +234,14 @@ const PlansModal: React.FC<PlansModalProps> = ({ isOpen, onClose, onSubscribe })
                                 <Info className="w-3 h-3" /> Pagamento seguro via Mercado Pago
                             </p>
                         </>
+                    ) : (
+                        // iOS Placeholder Button (Disabled)
+                        <button
+                            disabled
+                            className="w-full py-4 px-6 bg-slate-200 text-slate-400 rounded-2xl font-bold flex items-center justify-center gap-2 cursor-not-allowed"
+                        >
+                            Assinatura via App em breve
+                        </button>
                     )}
 
                     {/* Demo Request Button */}
