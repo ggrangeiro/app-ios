@@ -61,6 +61,8 @@ const fileToGenerativePart = async (file: File): Promise<{ inlineData: { data: s
       resolve({ inlineData: { data: base64Content, mimeType: file.type } });
     };
     reader.onerror = (e) => reject(new Error("Falha ao ler arquivo: " + e));
+    // CRITICAL FIX: Actually start reading the file!
+    reader.readAsDataURL(file);
   });
 };
 
@@ -980,23 +982,23 @@ export const regenerateDietPlanV2 = async (
  * @returns Objeto com dados extraídos e texto bruto
  */
 export const extractAnamnesisFromDocument = async (
-    documentFile: File,
-    userId: string | number,
-    userRole: string
+  documentFile: File,
+  userId: string | number,
+  userRole: string
 ): Promise<{ extractedData: Partial<Anamnesis>; rawText: string }> => {
-    const genAI = await getGenAI(userId, userRole);
+  const genAI = await getGenAI(userId, userRole);
 
-    // Reuse existing fileToGenerativePart if visible, or re-implement inline if not exported
-    // fileToGenerativePart is defined in lines 55-65 of this file but NOT exported. 
-    // Should be accessible since we are in the same file.
-    const docPart = await fileToGenerativePart(documentFile);
+  // Reuse existing fileToGenerativePart if visible, or re-implement inline if not exported
+  // fileToGenerativePart is defined in lines 55-65 of this file but NOT exported. 
+  // Should be accessible since we are in the same file.
+  const docPart = await fileToGenerativePart(documentFile);
 
-    const model = genAI.getGenerativeModel({
-        model: 'gemini-1.5-flash', // Use Flash for speed/cost on documents
-        generationConfig: { responseMimeType: "application/json" }
-    });
+  const model = genAI.getGenerativeModel({
+    model: 'gemini-1.5-flash', // Use Flash for speed/cost on documents
+    generationConfig: { responseMimeType: "application/json" }
+  });
 
-    const prompt = `
+  const prompt = `
     ATUE COMO UM ESPECIALISTA EM EXTRAÇÃO DE DADOS DE DOCUMENTOS DE SAÚDE E FITNESS.
 
     **IMPORTANTE**: Retorne APENAS um JSON válido, sem markdown.
@@ -1062,26 +1064,26 @@ export const extractAnamnesisFromDocument = async (
     }
   `;
 
-    try {
-        const result = await model.generateContent([
-            docPart, // Part object { inlineData: ... }
-            { text: prompt }
-        ]);
+  try {
+    const result = await model.generateContent([
+      docPart, // Part object { inlineData: ... }
+      { text: prompt }
+    ]);
 
-        const text = result.response.text();
-        const json = JSON.parse(text);
+    const text = result.response.text();
+    const json = JSON.parse(text);
 
-        return {
-            extractedData: json.extractedData || {},
-            rawText: json.rawText || ''
-        };
-    } catch (error: any) {
-        console.error("Erro ao extrair dados do documento:", error);
-        if (error.message?.includes('API key') || error.message?.includes('401')) {
-            resetGeminiInstance();
-        }
-        throw new Error("Não foi possível extrair os dados do documento.");
+    return {
+      extractedData: json.extractedData || {},
+      rawText: json.rawText || ''
+    };
+  } catch (error: any) {
+    console.error("Erro ao extrair dados do documento:", error);
+    if (error.message?.includes('API key') || error.message?.includes('401')) {
+      resetGeminiInstance();
     }
+    throw new Error("Não foi possível extrair os dados do documento.");
+  }
 };
 
 /**
@@ -1093,39 +1095,39 @@ export const extractAnamnesisFromDocument = async (
  * @returns Objeto com dados extraídos e texto bruto
  */
 export const extractAnamnesisFromGoogleDocs = async (
-    googleDocsUrl: string,
-    userId: string | number,
-    userRole: string
+  googleDocsUrl: string,
+  userId: string | number,
+  userRole: string
 ): Promise<{ extractedData: Partial<Anamnesis>; rawText: string }> => {
-    const genAI = await getGenAI(userId, userRole);
+  const genAI = await getGenAI(userId, userRole);
 
-    const docIdMatch = googleDocsUrl.match(/\/d\/([a-zA-Z0-9-_]+)/);
-    if (!docIdMatch) {
-        throw new Error("URL do Google Docs inválida.");
-    }
-    const docId = docIdMatch[1];
-    const isSpreadsheet = googleDocsUrl.includes('/spreadsheets/');
-    const exportUrl = isSpreadsheet
-        ? `https://docs.google.com/spreadsheets/d/${docId}/export?format=csv`
-        : `https://docs.google.com/document/d/${docId}/export?format=txt`;
+  const docIdMatch = googleDocsUrl.match(/\/d\/([a-zA-Z0-9-_]+)/);
+  if (!docIdMatch) {
+    throw new Error("URL do Google Docs inválida.");
+  }
+  const docId = docIdMatch[1];
+  const isSpreadsheet = googleDocsUrl.includes('/spreadsheets/');
+  const exportUrl = isSpreadsheet
+    ? `https://docs.google.com/spreadsheets/d/${docId}/export?format=csv`
+    : `https://docs.google.com/document/d/${docId}/export?format=txt`;
 
-    let documentContent: string;
-    try {
-        const response = await fetch(exportUrl);
-        if (!response.ok) throw new Error("Erro ao acessar doc. Verifique se é público.");
-        documentContent = await response.text();
-    } catch (e) {
-        throw new Error("Não foi possível acessar o Google Docs.");
-    }
+  let documentContent: string;
+  try {
+    const response = await fetch(exportUrl);
+    if (!response.ok) throw new Error("Erro ao acessar doc. Verifique se é público.");
+    documentContent = await response.text();
+  } catch (e) {
+    throw new Error("Não foi possível acessar o Google Docs.");
+  }
 
-    if (!documentContent || documentContent.length < 10) throw new Error("Documento vazio.");
+  if (!documentContent || documentContent.length < 10) throw new Error("Documento vazio.");
 
-    const model = genAI.getGenerativeModel({
-        model: 'gemini-1.5-flash',
-        generationConfig: { responseMimeType: "application/json" }
-    });
+  const model = genAI.getGenerativeModel({
+    model: 'gemini-1.5-flash',
+    generationConfig: { responseMimeType: "application/json" }
+  });
 
-    const prompt = `
+  const prompt = `
     ATUE COMO UM ESPECIALISTA EM EXTRAÇÃO DE DADOS.
     Texto do documento:
     """
@@ -1141,16 +1143,16 @@ export const extractAnamnesisFromGoogleDocs = async (
     Use a mesma estrutura de campos do documento normal.
   `;
 
-    try {
-        const result = await model.generateContent(prompt);
-        const json = JSON.parse(result.response.text());
-        return {
-            extractedData: json.extractedData || {},
-            rawText: json.rawText || documentContent
-        };
-    } catch (error: any) {
-        console.error("Erro no Gemini Docs:", error);
-        if (error.message?.includes('API key')) resetGeminiInstance();
-        throw new Error("Falha na extração.");
-    }
+  try {
+    const result = await model.generateContent(prompt);
+    const json = JSON.parse(result.response.text());
+    return {
+      extractedData: json.extractedData || {},
+      rawText: json.rawText || documentContent
+    };
+  } catch (error: any) {
+    console.error("Erro no Gemini Docs:", error);
+    if (error.message?.includes('API key')) resetGeminiInstance();
+    throw new Error("Falha na extração.");
+  }
 };
