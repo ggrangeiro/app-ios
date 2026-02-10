@@ -1,11 +1,76 @@
 import { GoogleGenerativeAI, SchemaType } from "@google/generative-ai";
-import { AnalysisResult, ExerciseType, SPECIAL_EXERCISES, WorkoutPlanV2, DietPlanV2, Anamnesis } from "../types";
+import { AnalysisResult, ExerciseType, SPECIAL_EXERCISES, WorkoutPlanV2, DietPlanV2, Anamnesis, MealAnalysisResult } from "../types";
 import { getGeminiApiKey, clearApiKeyCache } from "./configService";
+import i18next from 'i18next';
 
 // --- CONFIGURAÇÃO ---
 // Configuração dos modelos: Pro para tarefas complexas (vídeo) e Flash para suporte
 const ANALYSIS_MODEL = "gemini-3-pro-preview";
 const SUPPORT_MODEL = "gemini-3-flash-preview";
+
+// Timeout padrão para operações de IA (2 minutos)
+const DEFAULT_AI_TIMEOUT = 120000;
+
+// --- INTERNACIONALIZAÇÃO DOS PROMPTS ---
+// Mapeia o código de idioma do i18next para o nome completo do idioma
+const LANGUAGE_MAP: Record<string, string> = {
+  'pt': 'Português Brasileiro',
+  'pt-BR': 'Português Brasileiro',
+  'en': 'English',
+  'en-US': 'English',
+  'en-GB': 'English',
+  'es': 'Español',
+  'es-ES': 'Español',
+  'es-419': 'Español',
+};
+
+/**
+ * Retorna a instrução de idioma para ser injetada nos prompts da IA.
+ * Garante que a resposta da IA será no idioma do dispositivo do usuário.
+ */
+const getLanguageInstruction = (): string => {
+  const lang = i18next.language || 'pt';
+  const languageName = LANGUAGE_MAP[lang] || LANGUAGE_MAP[lang.split('-')[0]] || 'Português Brasileiro';
+  return `\n    IDIOMA OBRIGATÓRIO: Responda INTEIRAMENTE em ${languageName}. Todo o conteúdo gerado (nomes de exercícios, dias da semana, dicas, refeições, motivações, considerações, alertas) DEVE estar em ${languageName}.\n  `;
+};
+
+/**
+ * Wrapper que adiciona timeout a uma Promise
+ */
+const withTimeout = <T>(promise: Promise<T>, timeoutMs: number, signal?: AbortSignal): Promise<T> => {
+  return new Promise((resolve, reject) => {
+    // Verifica se já foi abortado
+    if (signal?.aborted) {
+      reject(new DOMException('Operação cancelada pelo usuário', 'AbortError'));
+      return;
+    }
+
+    // Listener para abort
+    const abortHandler = () => {
+      reject(new DOMException('Operação cancelada pelo usuário', 'AbortError'));
+    };
+    signal?.addEventListener('abort', abortHandler);
+
+    // Timeout
+    const timeoutId = setTimeout(() => {
+      signal?.removeEventListener('abort', abortHandler);
+      reject(new Error('TIMEOUT: A operação demorou muito. Tente novamente.'));
+    }, timeoutMs);
+
+    // Promise original
+    promise
+      .then((result) => {
+        clearTimeout(timeoutId);
+        signal?.removeEventListener('abort', abortHandler);
+        resolve(result);
+      })
+      .catch((error) => {
+        clearTimeout(timeoutId);
+        signal?.removeEventListener('abort', abortHandler);
+        reject(error);
+      });
+  });
+};
 
 // --- BLOCO DE SEGURANÇA E RELEVÂNCIA (ANTI-ALUCINAÇÃO) ---
 const SAFETY_PROMPT_BLOCK = `
@@ -170,6 +235,7 @@ export const analyzeVideo = async (
 
   const prompt = `
     ${detailedStyle}
+    ${getLanguageInstruction()}
     ${validationRules}
     ${historyContext}
     ${specificContext}
@@ -220,7 +286,8 @@ export const generateDietPlan = async (
   userRole: string,
   documentFile?: File | null,
   photoFile?: File | null,
-  personalConfig?: { methodology?: string; communicationStyle?: string }
+  personalConfig?: { methodology?: string; communicationStyle?: string },
+  signal?: AbortSignal
 ): Promise<string> => {
   const genAI = await getGenAI(userId, userRole);
   const model = genAI.getGenerativeModel({ model: SUPPORT_MODEL });
@@ -244,6 +311,7 @@ export const generateDietPlan = async (
 
   const prompt = `
     Atue como um Nutricionista Esportivo.
+    ${getLanguageInstruction()}
     ${personalContext}
 
     Perfil: ${userData.weight}kg, Objetivo: ${userData.goal}, Sexo: ${userData.gender}.
@@ -278,6 +346,11 @@ export const generateDietPlan = async (
   `;
 
   try {
+    // Verifica se já foi cancelado
+    if (signal?.aborted) {
+      throw new DOMException('Operação cancelada pelo usuário', 'AbortError');
+    }
+
     const parts: any[] = [{ text: prompt }];
 
     if (documentFile) {
@@ -290,14 +363,37 @@ export const generateDietPlan = async (
       parts.push(photoPart);
     }
 
-    const result = await model.generateContent(parts);
+    // Verifica novamente antes da chamada principal
+    if (signal?.aborted) {
+      throw new DOMException('Operação cancelada pelo usuário', 'AbortError');
+    }
+
+    // Executa com timeout
+    const result = await withTimeout(
+      model.generateContent(parts),
+      DEFAULT_AI_TIMEOUT,
+      signal
+    );
     return result.response.text().replace(/```html|```/g, "").trim();
   } catch (error: any) {
+    // Re-throw AbortError para tratamento adequado
+    if (error.name === 'AbortError') {
+      throw error;
+    }
+
     console.error("Erro ao gerar dieta:", error);
+
+    // Erro de timeout
+    if (error.message?.includes('TIMEOUT')) {
+      throw new Error('TIMEOUT: A geração da dieta demorou muito. Tente novamente.');
+    }
+
     if (error.message?.includes("API key") || error.message?.includes("401") || error.message?.includes("403")) {
       resetGeminiInstance();
+      throw new Error('API_ERROR: Erro de autenticação. Tente novamente.');
     }
-    return "<p>Erro ao gerar dieta.</p>";
+
+    throw new Error('GENERATION_ERROR: Erro ao gerar dieta. Tente novamente.');
   }
 };
 
@@ -312,7 +408,8 @@ export const generateWorkoutPlan = async (
   userRole: string,
   documentFile?: File | null,
   photoFile?: File | null,
-  personalConfig?: { methodology?: string; communicationStyle?: string }
+  personalConfig?: { methodology?: string; communicationStyle?: string },
+  signal?: AbortSignal
 ): Promise<string> => {
   const genAI = await getGenAI(userId, userRole);
   const model = genAI.getGenerativeModel({ model: SUPPORT_MODEL });
@@ -336,6 +433,7 @@ export const generateWorkoutPlan = async (
 
   const prompt = `
     Atue como um Personal Trainer Especialista e Motivador.
+    ${getLanguageInstruction()}
     ${personalContext}
 
     PERFIL DO ALUNO:
@@ -384,6 +482,11 @@ export const generateWorkoutPlan = async (
   `;
 
   try {
+    // Verifica se já foi cancelado
+    if (signal?.aborted) {
+      throw new DOMException('Operação cancelada pelo usuário', 'AbortError');
+    }
+
     const parts: any[] = [{ text: prompt }];
 
     if (documentFile) {
@@ -396,14 +499,37 @@ export const generateWorkoutPlan = async (
       parts.push(photoPart);
     }
 
-    const result = await model.generateContent(parts);
+    // Verifica novamente antes da chamada principal
+    if (signal?.aborted) {
+      throw new DOMException('Operação cancelada pelo usuário', 'AbortError');
+    }
+
+    // Executa com timeout
+    const result = await withTimeout(
+      model.generateContent(parts),
+      DEFAULT_AI_TIMEOUT,
+      signal
+    );
     return result.response.text().replace(/```html|```/g, "").trim();
   } catch (error: any) {
+    // Re-throw AbortError para tratamento adequado
+    if (error.name === 'AbortError') {
+      throw error;
+    }
+
     console.error("Erro ao gerar treino:", error);
+
+    // Erro de timeout
+    if (error.message?.includes('TIMEOUT')) {
+      throw new Error('TIMEOUT: A geração do treino demorou muito. Tente novamente.');
+    }
+
     if (error.message?.includes("API key") || error.message?.includes("401") || error.message?.includes("403")) {
       resetGeminiInstance();
+      throw new Error('API_ERROR: Erro de autenticação. Tente novamente.');
     }
-    return "<p>Erro ao gerar treino.</p>";
+
+    throw new Error('GENERATION_ERROR: Erro ao gerar treino. Tente novamente.');
   }
 };
 
@@ -429,6 +555,7 @@ export const regenerateWorkoutPlan = async (
 
   const prompt = `
     Atue como um Personal Trainer Especialista.
+    ${getLanguageInstruction()}
     
     CONTEXTO ORIGINAL DO ALUNO:
     - Sexo: ${userData.gender || 'não informado'}
@@ -489,6 +616,7 @@ export const regenerateDietPlan = async (
 
   const prompt = `
     Atue como um Nutricionista Esportivo Especialista.
+    ${getLanguageInstruction()}
     
     CONTEXTO ORIGINAL DO ALUNO:
     - Sexo: ${userData.gender || 'não informado'}
@@ -536,6 +664,7 @@ export const generateProgressInsight = async (
   const genAI = await getGenAI(userId, userRole);
   const model = genAI.getGenerativeModel({ model: SUPPORT_MODEL });
   const prompt = `
+    ${getLanguageInstruction()}
     Atue como um Amigo de Treino. Compare hoje (Nota ${current.score}) com a anterior (Nota ${previous.score}) no exercício ${type}.
     Seja muito positivo, use emojis e seja curto (máximo 3 frases).
   `;
@@ -600,6 +729,7 @@ export const generateWorkoutPlanV2 = async (
 
   const prompt = `
     Atue como um Personal Trainer de Elite altamente técnico.
+    ${getLanguageInstruction()}
     ${personalContext}
     
     Analise o perfil e documentos do aluno para criar um TREINO ESTRUTURADO (V2) em formato JSON.
@@ -796,6 +926,7 @@ export const generateDietPlanV2 = async (
 
   const prompt = `
     Atue como um Nutricionista Esportivo de Elite.
+    ${getLanguageInstruction()}
     ${personalContext}
 
     Analise o perfil e documentos do aluno para criar uma DIETA ESTRUTURADA (V2) em formato JSON.
@@ -907,6 +1038,7 @@ export const regenerateWorkoutPlanV2 = async (
 
   const prompt = `
     Atue como um Personal Trainer Ajustando uma Ficha.
+    ${getLanguageInstruction()}
     
     TAREFA: Você receberá um TREINO ATUAL (JSON) e um FEEDBACK DO ALUNO.
     Sua missão é regenerar o JSON aplicando APENAS as alterações solicitadas, mantendo a estrutura original intacta onde não for afetado.
@@ -945,6 +1077,7 @@ export const regenerateDietPlanV2 = async (
 
   const prompt = `
     Atue como um Nutricionista Ajustando uma Dieta.
+    ${getLanguageInstruction()}
     
     TAREFA: Você receberá uma DIETA ATUAL (JSON) e um FEEDBACK DO ALUNO.
     Sua missão é regenerar o JSON aplicando APENAS as alterações solicitadas, mantendo a estrutura original intacta onde não for afetado.
@@ -1156,3 +1289,83 @@ export const extractAnamnesisFromGoogleDocs = async (
     throw new Error("Falha na extração.");
   }
 };
+
+// --- ANÁLISE DE PRATO (MEAL ANALYSIS) ---
+export const analyzeMealPhoto = async (
+  photoFile: File,
+  userId: string | number,
+  userRole: string
+): Promise<MealAnalysisResult> => {
+  const genAI = await getGenAI(userId, userRole);
+  const model = genAI.getGenerativeModel({
+    model: SUPPORT_MODEL,
+    generationConfig: { responseMimeType: "application/json" }
+  });
+
+  const photoPart = await fileToGenerativePart(photoFile);
+
+  const prompt = `
+    ${getLanguageInstruction()}
+    Atue como um Nutricionista Esportivo de Elite com vasta experiência em análise visual de refeições.
+
+    Analise CUIDADOSAMENTE a foto do prato enviada pelo aluno.
+
+    INSTRUÇÕES:
+    1. IDENTIFIQUE TODOS os alimentos visíveis no prato com a maior precisão possível.
+    2. ESTIME as quantidades (em gramas ou porções) de cada alimento.
+    3. CALCULE as calorias de cada alimento e o total.
+    4. CALCULE os macronutrientes totais (proteína, carboidratos, gorduras, fibras) em gramas.
+    5. DÊ uma nota de 0 a 100 para o quão saudável é o prato (healthScore).
+    6. Forneça 2-3 dicas curtas e práticas para melhorar a refeição.
+    7. Inclua uma mensagem motivacional curta e encorajadora.
+    8. Para cada alimento, atribua uma cor vibrante que represente o grupo alimentar:
+       - Proteínas: "#EF4444" (vermelho)
+       - Carboidratos/Grãos: "#F59E0B" (âmbar)
+       - Vegetais verdes: "#10B981" (verde)
+       - Frutas: "#8B5CF6" (roxo)
+       - Laticínios: "#3B82F6" (azul)
+       - Gorduras/Óleos: "#F97316" (laranja)
+       - Outros: "#EC4899" (rosa)
+    9. O campo "plateDescription" deve ser uma descrição curta e amigável do prato (1-2 frases).
+
+    VALIDAÇÃO:
+    - Se a imagem NÃO contiver comida/alimento, retorne healthScore: 0, foods: [], totalCalories: 0, e plateDescription explicando que não foi possível identificar alimentos.
+    - JAMAIS invente alimentos que não estão visíveis na foto.
+
+    Responda EXCLUSIVAMENTE em JSON com esta estrutura exata:
+    {
+      "foods": [
+        { "name": "string", "quantity": "string (ex: 150g)", "calories": number, "color": "string (hex)" }
+      ],
+      "totalCalories": number,
+      "protein": number,
+      "carbs": number,
+      "fats": number,
+      "fiber": number,
+      "healthScore": number,
+      "plateDescription": "string",
+      "tips": ["string", "string"],
+      "motivation": "string"
+    }
+  `;
+
+  try {
+    const result = await withTimeout(
+      model.generateContent([
+        { inlineData: photoPart.inlineData },
+        { text: prompt }
+      ]),
+      DEFAULT_AI_TIMEOUT
+    );
+
+    const text = result.response.text();
+    return JSON.parse(text) as MealAnalysisResult;
+  } catch (error: any) {
+    console.error("Erro na análise do prato:", error);
+    if (error.message?.includes("API key") || error.message?.includes("401") || error.message?.includes("403")) {
+      resetGeminiInstance();
+    }
+    throw new Error("Não consegui analisar o prato agora. Tente novamente!");
+  }
+};
+
