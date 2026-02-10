@@ -1,0 +1,6 @@
+/* iOS Permission Strings - English */
+"NSCameraUsageDescription" = "The app uses the camera to capture photos when you add images of your physical progress.";
+"NSLocationWhenInUseUsageDescription" = "The app uses your location to validate in-person gym check-ins and verify conditions for achievements.";
+"NSPhotoLibraryAddUsageDescription" = "The app saves workout plans, diets, and progress images to your gallery when requested.";
+"NSPhotoLibraryUsageDescription" = "The app allows selecting images from your gallery to track and compare your physical evolution.";
+"CFBundleDisplayName" = "Fit Analyzer";

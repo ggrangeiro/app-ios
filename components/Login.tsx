@@ -4,6 +4,9 @@ import { apiService } from '../services/apiService';
 import { secureStorage } from '../utils/secureStorage';
 import { Dumbbell, ArrowRight, Lock, Mail, User as UserIcon, Phone, X, CheckCircle, Loader2, Medal, Crown, MessageCircle, Eye, EyeOff } from 'lucide-react';
 import { ToastType } from './Toast';
+import { Capacitor } from '@capacitor/core';
+
+const isIOS = Capacitor.getPlatform() === 'ios';
 
 interface LoginProps {
   onLogin: (user: User) => void;
@@ -55,7 +58,8 @@ const Login: React.FC<LoginProps> = ({ onLogin, showToast, onViewPlans }) => {
       if (isRegistering) {
         // --- CADASTRO (V2) ---
         if (!name.trim()) throw new Error("Por favor, digite seu nome.");
-        if (!phone.trim()) throw new Error("Por favor, digite seu telefone.");
+        // Phone is optional for iOS App Store compliance (guideline 5.1.1)
+        if (!isIOS && !phone.trim()) throw new Error("Por favor, digite seu telefone.");
         if (!password.trim()) throw new Error("Por favor, digite uma senha.");
         if (password !== confirmPassword) throw new Error("As senhas não conferem.");
 
@@ -134,7 +138,8 @@ const Login: React.FC<LoginProps> = ({ onLogin, showToast, onViewPlans }) => {
   return (
     <div className="min-h-screen flex items-center justify-center p-4">
       {/* Button moved outside glass-panel for guaranteed z-index interaction */}
-      {onViewPlans && (
+      {/* Hide on iOS to avoid App Store rejection for payment-related UI */}
+      {!isIOS && onViewPlans && (
         <button
           type="button"
           onClick={(e) => {
@@ -233,12 +238,12 @@ const Login: React.FC<LoginProps> = ({ onLogin, showToast, onViewPlans }) => {
                 </div>
 
                 <div className="space-y-1 animate-in slide-in-from-top-4 duration-300" style={{ animationDelay: '50ms' }}>
-                  <label className="text-sm font-medium text-slate-300 ml-1">Telefone <span className="text-red-500">*</span></label>
+                  <label className="text-sm font-medium text-slate-300 ml-1">Telefone {!isIOS && <span className="text-red-500">*</span>}{isIOS && <span className="text-slate-500 text-xs">(opcional)</span>}</label>
                   <div className="relative">
                     <Phone className="absolute left-4 top-3.5 w-5 h-5 text-slate-500" />
                     <input
                       type="tel"
-                      required={isRegistering}
+                      required={isRegistering && !isIOS}
                       value={phone}
                       onChange={handlePhoneChange}
                       placeholder="(11) 98888-7777"
@@ -327,10 +332,10 @@ const Login: React.FC<LoginProps> = ({ onLogin, showToast, onViewPlans }) => {
 
             <button
               type="submit"
-              disabled={loading || (isRegistering && (!name.trim() || !phone.trim() || !email.trim() || !password || !confirmPassword || password !== confirmPassword))}
+              disabled={loading || (isRegistering && (!name.trim() || (!isIOS && !phone.trim()) || !email.trim() || !password || !confirmPassword || password !== confirmPassword))}
               className={`
                       mt-2 w-full font-bold py-3.5 rounded-xl transition-all shadow-lg shadow-blue-900/20 active:scale-[0.98] flex items-center justify-center gap-2
-                      ${(isRegistering && (!name.trim() || !phone.trim() || !email.trim() || !password || !confirmPassword || password !== confirmPassword)) ? 'opacity-50 cursor-not-allowed' : ''}
+                      ${(isRegistering && (!name.trim() || (!isIOS && !phone.trim()) || !email.trim() || !password || !confirmPassword || password !== confirmPassword)) ? 'opacity-50 cursor-not-allowed' : ''}
                       ${isRegistering
                   ? (role === 'user'
                     ? 'bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white'

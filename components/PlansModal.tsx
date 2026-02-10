@@ -111,6 +111,79 @@ const PlansModal: React.FC<PlansModalProps> = ({ isOpen, onClose, onSubscribe })
             : 'border border-slate-200 bg-white hover:border-slate-300';
     };
 
+    // iOS: Show only a simple message without prices or payment options
+    if (isIOS) {
+        return (
+            <div className="fixed inset-0 z-[100] flex items-end sm:items-center justify-center bg-black/60 backdrop-blur-sm transition-opacity px-0 sm:px-4">
+                <div
+                    className="w-full max-w-lg bg-white rounded-t-3xl sm:rounded-3xl shadow-2xl overflow-hidden animate-slide-up sm:animate-fade-in"
+                    style={{ maxHeight: '95vh' }}
+                >
+                    {/* Header */}
+                    <div className="relative p-6 border-b border-slate-100 flex items-center justify-between bg-gradient-to-r from-slate-50 to-white">
+                        <div>
+                            <h2 className="text-xl font-bold text-slate-900 flex items-center gap-2">
+                                Recursos Premium <Star className="w-5 h-5 text-amber-500 fill-amber-500" />
+                            </h2>
+                            <p className="text-sm text-slate-500">Evolua sua performance com IA</p>
+                        </div>
+                        <button
+                            onClick={onClose}
+                            className="p-2 hover:bg-slate-100 rounded-full transition-colors text-slate-400 hover:text-slate-600"
+                        >
+                            <X className="w-6 h-6" />
+                        </button>
+                    </div>
+
+                    <div className="p-6">
+                        {/* Feature List */}
+                        <div className="bg-slate-50 rounded-2xl p-5 mb-6 border border-slate-100">
+                            <h3 className="text-lg font-bold text-slate-900 mb-4">
+                                Benefícios dos Planos
+                            </h3>
+                            <div className="space-y-3">
+                                {[
+                                    'Créditos de Análise Biomecânica',
+                                    'Gerações de Treino com IA',
+                                    'Gerações de Dieta Personalizada',
+                                    'Histórico de Evolução Completo',
+                                    'Suporte Prioritário'
+                                ].map((benefit, i) => (
+                                    <div key={i} className="flex items-start gap-3">
+                                        <div className="mt-0.5 bg-emerald-100 p-0.5 rounded-full">
+                                            <Check className="w-3.5 h-3.5 text-emerald-600 stroke-[3px]" />
+                                        </div>
+                                        <p className="text-sm text-slate-600">{benefit}</p>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+
+                        {/* Close Button */}
+                        <button
+                            onClick={onClose}
+                            className="w-full py-4 px-6 bg-slate-900 hover:bg-black text-white rounded-2xl font-bold flex items-center justify-center gap-2 transition-all active:scale-[0.98] shadow-lg shadow-slate-200"
+                        >
+                            Entendi
+                        </button>
+
+                        {/* Demo Request Button */}
+                        <a
+                            href="https://wa.me/5511974927080?text=Olá! Gostaria de saber mais sobre o FitAI."
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="mt-3 w-full flex items-center justify-center gap-2 py-3 rounded-2xl border border-emerald-500/30 bg-emerald-50 hover:bg-emerald-100 text-emerald-600 font-medium transition-all text-sm"
+                        >
+                            <MessageCircle className="w-4 h-4" />
+                            <span>Fale conosco no WhatsApp</span>
+                        </a>
+                    </div>
+                </div>
+            </div>
+        );
+    }
+
+    // Non-iOS: Full functionality with prices and payment
     return (
         <div className="fixed inset-0 z-[100] flex items-end sm:items-center justify-center bg-black/60 backdrop-blur-sm transition-opacity px-0 sm:px-4">
             {/* Container do Modal / Bottom Sheet */}
@@ -136,20 +209,6 @@ const PlansModal: React.FC<PlansModalProps> = ({ isOpen, onClose, onSubscribe })
 
                 {/* Plan Cards Grid */}
                 <div className="p-6 overflow-y-auto" style={{ maxHeight: 'calc(95vh - 160px)' }}>
-
-                    {/* iOS Warning (Temporary until Native Payment) */}
-                    {isIOS && (
-                        <div className="mb-6 p-4 bg-slate-50 border border-slate-200 rounded-2xl flex flex-col items-center text-center gap-2">
-                            <AlertCircle className="w-6 h-6 text-amber-500" />
-                            <p className="text-sm text-slate-600">
-                                Para assinar, acesse <strong className="text-slate-900">fitanalizer.com.br/planos</strong> pelo navegador.
-                            </p>
-                            <p className="text-xs text-slate-400">
-                                A compra via app estará disponível em breve.
-                            </p>
-                        </div>
-                    )}
-
                     <div className="grid grid-cols-3 gap-3 mb-8">
                         {PLANS.map((plan, idx) => {
                             const isSelected = selectedPlanIdx === idx;
@@ -219,30 +278,18 @@ const PlansModal: React.FC<PlansModalProps> = ({ isOpen, onClose, onSubscribe })
                         </div>
                     </div>
 
-                    {/* Action Button - Only enabled for Android/Web or if we want to allow generic flow */}
-                    {!isIOS ? (
-                        <>
-                            <button
-                                onClick={() => onSubscribe(currentPlan.id, currentPlan.name, currentPlan.price)}
-                                className="w-full py-4 px-6 bg-slate-900 hover:bg-black text-white rounded-2xl font-bold flex items-center justify-center gap-2 transition-all active:scale-[0.98] shadow-lg shadow-slate-200"
-                            >
-                                Assinar {currentPlan.name} agora
-                                <ArrowRight className="w-5 h-5" />
-                            </button>
+                    {/* Action Button */}
+                    <button
+                        onClick={() => onSubscribe(currentPlan.id, currentPlan.name, currentPlan.price)}
+                        className="w-full py-4 px-6 bg-slate-900 hover:bg-black text-white rounded-2xl font-bold flex items-center justify-center gap-2 transition-all active:scale-[0.98] shadow-lg shadow-slate-200"
+                    >
+                        Assinar {currentPlan.name} agora
+                        <ArrowRight className="w-5 h-5" />
+                    </button>
 
-                            <p className="mt-4 text-center text-[11px] text-slate-400 flex items-center justify-center gap-1">
-                                <Info className="w-3 h-3" /> Pagamento seguro via Mercado Pago
-                            </p>
-                        </>
-                    ) : (
-                        // iOS Placeholder Button (Disabled)
-                        <button
-                            disabled
-                            className="w-full py-4 px-6 bg-slate-200 text-slate-400 rounded-2xl font-bold flex items-center justify-center gap-2 cursor-not-allowed"
-                        >
-                            Assinatura via App em breve
-                        </button>
-                    )}
+                    <p className="mt-4 text-center text-[11px] text-slate-400 flex items-center justify-center gap-1">
+                        <Info className="w-3 h-3" /> Pagamento seguro via Mercado Pago
+                    </p>
 
                     {/* Demo Request Button */}
                     <a

@@ -24,6 +24,8 @@
 	<string>$(CURRENT_PROJECT_VERSION)</string>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
+	<key>NSCameraUsageDescription</key>
+	<string>O app pode usar a câmera para capturar fotos quando você adiciona imagens do seu progresso físico.</string>
 	<key>NSLocationWhenInUseUsageDescription</key>
 	<string>"O app utiliza sua localização para validar o check-in presencial na academia e verificar condições para conquistas."
 </string>

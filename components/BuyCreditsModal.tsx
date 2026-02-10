@@ -37,8 +37,12 @@ export const CreditsModal: React.FC<BuyCreditsModalProps> = ({ isOpen, onClose, 
     const [processingPayment, setProcessingPayment] = useState(false);
 
     useEffect(() => {
-        if (isOpen && activeTab === 'HISTORY' && currentUser) {
-            loadHistory();
+        if (isOpen && currentUser) {
+            // For iOS, always load history since that's all we show
+            // For other platforms, load only when HISTORY tab is active
+            if (isIOS || activeTab === 'HISTORY') {
+                loadHistory();
+            }
         }
     }, [isOpen, activeTab]);
 
@@ -59,6 +63,76 @@ export const CreditsModal: React.FC<BuyCreditsModalProps> = ({ isOpen, onClose, 
 
     const selectedPlan = PLANS.find(p => p.id === selectedPlanId) || PLANS[1];
 
+    // iOS: Show only history, no purchase options
+    if (isIOS) {
+        return (
+            <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/80 backdrop-blur-md p-4 animate-in fade-in">
+                <div className="bg-slate-900 border border-slate-700 rounded-3xl w-full max-w-md relative shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
+                    {/* Header */}
+                    <div className="p-6 pb-4 relative z-10 bg-slate-900 border-b border-slate-800">
+                        <button
+                            onClick={onClose}
+                            className="absolute top-4 right-4 text-slate-400 hover:text-white transition-colors z-10 bg-slate-800 p-2 rounded-full"
+                        >
+                            <X className="w-5 h-5" />
+                        </button>
+                        <div className="flex items-center gap-3">
+                            <div className="p-2.5 bg-gradient-to-br from-amber-500 to-orange-600 rounded-xl shadow-lg">
+                                <Coins className="w-6 h-6 text-white" />
+                            </div>
+                            <div>
+                                <h2 className="text-xl font-bold text-white">Seus Créditos</h2>
+                                <p className="text-slate-400 text-sm">{currentUser?.credits || 0} créditos disponíveis</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* History Only */}
+                    <div className="flex-1 overflow-y-auto p-4">
+                        {loadingHistory ? (
+                            <div className="flex items-center justify-center py-8">
+                                <Loader2 className="w-6 h-6 text-blue-400 animate-spin" />
+                            </div>
+                        ) : history.length === 0 ? (
+                            <div className="text-center py-8 text-slate-500">
+                                <History className="w-10 h-10 mx-auto mb-2 opacity-50" />
+                                <p>Nenhuma movimentação</p>
+                            </div>
+                        ) : (
+                            <div className="space-y-2">
+                                {history.map((item, idx) => (
+                                    <div key={idx} className="flex items-center justify-between bg-slate-800/50 p-3 rounded-xl border border-slate-700/50">
+                                        <div className="flex items-center gap-3">
+                                            <div className={`p-1.5 rounded-lg ${item.type === 'GAIN' ? 'bg-emerald-500/20 text-emerald-400' : 'bg-red-500/20 text-red-400'}`}>
+                                                {item.type === 'GAIN' ? <ArrowUpRight className="w-4 h-4" /> : <ArrowDownLeft className="w-4 h-4" />}
+                                            </div>
+                                            <div>
+                                                <p className="text-sm text-white font-medium">{item.description || (item.type === 'GAIN' ? 'Créditos adicionados' : 'Créditos usados')}</p>
+                                                <p className="text-xs text-slate-500">{formatDate(item.createdAt)}</p>
+                                            </div>
+                                        </div>
+                                        <span className={`font-bold ${item.type === 'GAIN' ? 'text-emerald-400' : 'text-red-400'}`}>
+                                            {item.type === 'GAIN' ? '+' : '-'}{item.amount}
+                                        </span>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+                    </div>
+
+                    {/* Close Button */}
+                    <div className="p-4 border-t border-slate-800">
+                        <button
+                            onClick={onClose}
+                            className="w-full py-3 bg-slate-800 hover:bg-slate-700 text-white font-bold rounded-xl transition-colors"
+                        >
+                            Fechar
+                        </button>
+                    </div>
+                </div>
+            </div>
+        );
+    }
 
 
     const handleCheckout = async () => {

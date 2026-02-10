@@ -68,6 +68,59 @@ export const SubscriptionModal: React.FC<SubscriptionModalProps> = ({ isOpen, on
 
     if (!isOpen) return null;
 
+    // iOS: Show simplified version without prices or payment options
+    if (isIOS) {
+        return (
+            <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/80 backdrop-blur-md p-4 animate-in fade-in">
+                <div className="bg-slate-900 border border-slate-700 rounded-3xl w-full max-w-lg relative shadow-2xl overflow-hidden flex flex-col">
+                    {/* Header */}
+                    <div className="p-6 pb-4 relative z-10 bg-slate-900 border-b border-slate-800">
+                        <button
+                            onClick={onClose}
+                            className="absolute top-6 right-6 text-slate-400 hover:text-white transition-colors z-10 bg-slate-800/50 p-2 rounded-full"
+                        >
+                            <X className="w-5 h-5" />
+                        </button>
+                        <div className="flex flex-col items-center text-center">
+                            <div className="p-3 bg-gradient-to-br from-purple-500 to-indigo-600 rounded-2xl shadow-lg mb-4">
+                                <Crown className="w-8 h-8 text-white" />
+                            </div>
+                            <h2 className="text-2xl font-bold text-white mb-2">Recursos Premium</h2>
+                            <p className="text-slate-400">
+                                Desbloqueie todo o potencial do FitAI
+                            </p>
+                        </div>
+                    </div>
+
+                    {/* Features */}
+                    <div className="p-6">
+                        <div className="space-y-3 mb-6">
+                            {[
+                                'Análises biomecânicas ilimitadas',
+                                'Geração de treinos com IA',
+                                'Dietas personalizadas',
+                                'Histórico completo de evolução',
+                                'Suporte prioritário'
+                            ].map((feature, idx) => (
+                                <div key={idx} className="flex items-start gap-2 text-sm text-slate-300">
+                                    <CheckCircle2 className="w-4 h-4 mt-0.5 flex-shrink-0 text-purple-400" />
+                                    <span>{feature}</span>
+                                </div>
+                            ))}
+                        </div>
+
+                        <button
+                            onClick={onClose}
+                            className="w-full py-3 bg-gradient-to-r from-purple-600 to-indigo-600 text-white font-bold rounded-xl"
+                        >
+                            Entendi
+                        </button>
+                    </div>
+                </div>
+            </div>
+        );
+    }
+
     const selectedPlanData = plans.find(p => p.id === selectedPlanId);
 
     // Filter out FREE plan from display if desired, or keep it for comparison
