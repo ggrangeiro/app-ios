@@ -312,9 +312,35 @@ export const ResultView: React.FC<ResultViewProps> = ({
     try {
       const planHtml = await generateWorkoutPlan(workoutFormData, currentUser?.id || userId, currentUser?.role || 'user', workoutDocument, workoutPhoto);
 
-      const response = await apiService.createTraining(userId, planHtml, workoutFormData.goal);
+      // --- CRITICAL FIX: Extract Structured Data for Interactive Mode ---
+      let daysDataStr: string | undefined = undefined;
+      const match = planHtml.match(/<!-- DATA_JSON_START -->([\s\S]*?)<!-- DATA_JSON_END -->/);
+      if (match && match[1]) {
+        try {
+          JSON.parse(match[1]);
+          daysDataStr = match[1];
+        } catch (e) {
+          console.warn("Failed to parse hidden JSON from workout plan", e);
+        }
+      }
+
+      // Salva no backend (V1)
+      const response = await apiService.createTraining(userId, planHtml, workoutFormData.goal, daysDataStr);
       if (response && response.id) {
         setCurrentWorkoutId(response.id);
+      }
+
+      // CRITICAL: Also create V2 structured record for interactive mode
+      if (daysDataStr) {
+        try {
+          await apiService.createTrainingV2(userId, daysDataStr, workoutFormData.goal, {
+            level: workoutFormData.level,
+            legacyHtml: planHtml
+          });
+        } catch {
+          // Non-blocking: V1 was created, V2 is a bonus
+          console.warn("[ResultView] Failed to create V2 structured plan, V1 was saved.");
+        }
       }
 
       if (onWorkoutSaved) onWorkoutSaved();
