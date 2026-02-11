@@ -760,7 +760,7 @@ ${strengthsText}${improvementsText}
               </fieldset>
               <button type="submit" disabled={dietLoading} className="w-full mt-4 bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-4 rounded-xl shadow-lg transition-all flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed">
                 {dietLoading ? <Loader2 className="w-5 h-5 animate-spin" /> : <Sparkles className="w-5 h-5" />}
-                {dietLoading ? "Gerando..." : "Gerar Dieta (1 Crédito)"}
+                {dietLoading ? "Gerando..." : (currentUser?.role === 'admin' ? "Gerar Dieta" : "Gerar Dieta (1 Crédito)")}
               </button>
             </form>
           </div>
@@ -951,7 +951,7 @@ ${strengthsText}${improvementsText}
 
               <button type="submit" disabled={workoutLoading} className="w-full mt-4 bg-blue-600 hover:bg-blue-500 text-white font-bold py-4 rounded-xl shadow-lg transition-all flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed">
                 {workoutLoading ? <Loader2 className="w-5 h-5 animate-spin" /> : <Sparkles className="w-5 h-5" />}
-                {workoutLoading ? "Gerando..." : "Gerar Treino (1 Crédito)"}
+                {workoutLoading ? "Gerando..." : (currentUser?.role === 'admin' ? "Gerar Treino" : "Gerar Treino (1 Crédito)")}
               </button>
             </form>
           </div>

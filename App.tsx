@@ -1305,13 +1305,12 @@ const App: React.FC = () => {
     // personalId might be null, undefined or empty string
     const hasPersonal = !!user.personalId;
 
-    // Startup Modal removed for App Store Compliance
-    /*
-    const isProUser = user.role === 'admin' || user.role === 'personal' || user.role === 'professor';
-    if (isFree && !hasPersonal && !isIOS && !isProUser) {
-       setTimeout(() => setShowPlansModal(true), 500);
+    // Show AI Privacy Consent Modal on login if not yet accepted
+    const hasConsented = localStorage.getItem('AI_CONSENT_ACCEPTED');
+    if (hasConsented !== 'true') {
+      setTimeout(() => setShowPrivacyModal(true), 500);
     }
-    */  };
+  };
 
   const handleLogout = () => {
     MockDataService.logout();
@@ -2549,7 +2548,7 @@ const App: React.FC = () => {
             </div>
           </div>
 
-          <button type="submit" disabled={generatingWorkout} className="w-full bg-blue-600 hover:bg-blue-500 text-white font-bold py-3 rounded-xl transition-all">{generatingWorkout ? <Loader2 className="animate-spin mx-auto" /> : `Gerar Treino com IA (-${getGenerationCost()} Créditos)`}</button>
+          <button type="submit" disabled={generatingWorkout} className="w-full bg-blue-600 hover:bg-blue-500 text-white font-bold py-3 rounded-xl transition-all">{generatingWorkout ? <Loader2 className="animate-spin mx-auto" /> : (currentUser?.role === 'admin' ? 'Gerar Treino com IA' : `Gerar Treino com IA (-${getGenerationCost()} Créditos)`)}</button>
         </form>
       </div>
     </div>
@@ -2623,7 +2622,7 @@ const App: React.FC = () => {
             </div>
           </div>
 
-          <button type="submit" disabled={generatingDiet} className="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-3 rounded-xl transition-all">{generatingDiet ? <Loader2 className="animate-spin mx-auto" /> : `Gerar Dieta com IA (-${getGenerationCost()} Créditos)`}</button>
+          <button type="submit" disabled={generatingDiet} className="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-3 rounded-xl transition-all">{generatingDiet ? <Loader2 className="animate-spin mx-auto" /> : (currentUser?.role === 'admin' ? 'Gerar Dieta com IA' : `Gerar Dieta com IA (-${getGenerationCost()} Créditos)`)}</button>
         </form>
       </div>
     </div>
