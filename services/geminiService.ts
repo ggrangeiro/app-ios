@@ -1291,10 +1291,20 @@ export const extractAnamnesisFromGoogleDocs = async (
 };
 
 // --- ANÁLISE DE PRATO (MEAL ANALYSIS) ---
+/**
+ * Analisa uma foto do prato do aluno e retorna informações nutricionais detalhadas.
+ * @param photoFile - Arquivo de imagem do prato
+ * @param userId - ID do usuário logado
+ * @param userRole - Role do usuário
+ * @param dietInfo - Dados da dieta ativa do aluno (opcional)
+ * @param dietHtml - HTML da dieta V1 caso não tenha V2 (opcional)
+ */
 export const analyzeMealPhoto = async (
   photoFile: File,
   userId: string | number,
-  userRole: string
+  userRole: string,
+  dietInfo?: { totalCalories: number; protein: number; carbs: number; fats: number } | null,
+  dietHtml?: string | null
 ): Promise<MealAnalysisResult> => {
   const genAI = await getGenAI(userId, userRole);
   const model = genAI.getGenerativeModel({
@@ -1303,6 +1313,56 @@ export const analyzeMealPhoto = async (
   });
 
   const photoPart = await fileToGenerativePart(photoFile);
+
+  // Bloco condicional de dieta para o prompt
+  let dietContext = '';
+  if (dietInfo) {
+    dietContext = `
+    CONTEXTO DA DIETA DO ALUNO (IMPORTANTE):
+    O aluno possui uma dieta prescrita com as seguintes METAS DIÁRIAS:
+    - Calorias diárias: ${dietInfo.totalCalories} kcal
+    - Proteína diária: ${dietInfo.protein}g
+    - Carboidratos diário: ${dietInfo.carbs}g
+    - Gorduras diária: ${dietInfo.fats}g
+
+    INSTRUÇÃO ADICIONAL (DIETA):
+    10. COMPARE o prato analisado com as metas diárias da dieta do aluno.
+    11. CALCULE a porcentagem (%) que esse prato representa do total de calorias diárias.
+    12. DÊ um veredito curto (1-2 frases) sobre se o prato está alinhado com a dieta.
+    13. FORNEÇA 1-3 sugestões práticas para alinhar melhor o prato com a dieta.
+    14. PREENCHA o campo "dietAdherence" no JSON de resposta.
+  `;
+  } else if (dietHtml) {
+    dietContext = `
+    CONTEXTO DA DIETA DO ALUNO (IMPORTANTE):
+    O aluno possui a seguinte dieta prescrita (HTML). Extraia as metas diárias de calorias e macronutrientes dela:
+    """
+    ${dietHtml.substring(0, 4000)}
+    """
+
+    INSTRUÇÃO ADICIONAL (DIETA):
+    10. EXTRAIA as metas diárias de calorias, proteínas, carboidratos e gorduras da dieta acima.
+    11. COMPARE o prato analisado com essas metas diárias.
+    12. CALCULE a porcentagem (%) que esse prato representa do total de calorias diárias.
+    13. DÊ um veredito curto (1-2 frases) sobre se o prato está alinhado com a dieta.
+    14. FORNEÇA 1-3 sugestões práticas para alinhar melhor o prato com a dieta.
+    15. PREENCHA o campo "dietAdherence" no JSON de resposta.
+  `;
+  }
+
+  const hasDiet = !!dietInfo || !!dietHtml;
+
+  // Schema condicional de dietAdherence
+  const dietAdherenceSchema = hasDiet ? `
+      "dietAdherence": {
+        "dailyCaloriesTarget": number,
+        "dailyProteinTarget": number,
+        "dailyCarbsTarget": number,
+        "dailyFatsTarget": number,
+        "mealCaloriesPercentage": number,
+        "verdict": "string (1-2 frases sobre aderência à dieta)",
+        "suggestions": ["string (sugestão prática)"]
+      }` : '';
 
   const prompt = `
     ${getLanguageInstruction()}
@@ -1327,6 +1387,7 @@ export const analyzeMealPhoto = async (
        - Gorduras/Óleos: "#F97316" (laranja)
        - Outros: "#EC4899" (rosa)
     9. O campo "plateDescription" deve ser uma descrição curta e amigável do prato (1-2 frases).
+    ${dietContext}
 
     VALIDAÇÃO:
     - Se a imagem NÃO contiver comida/alimento, retorne healthScore: 0, foods: [], totalCalories: 0, e plateDescription explicando que não foi possível identificar alimentos.
@@ -1345,7 +1406,7 @@ export const analyzeMealPhoto = async (
       "healthScore": number,
       "plateDescription": "string",
       "tips": ["string", "string"],
-      "motivation": "string"
+      "motivation": "string"${dietAdherenceSchema ? ',\n' + dietAdherenceSchema : ''}
     }
   `;
 

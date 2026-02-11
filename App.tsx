@@ -3483,6 +3483,7 @@ const App: React.FC = () => {
           userId={currentUser.id}
           userRole={currentUser.role}
           showToast={showToast}
+          dietPlan={savedDiets.length > 0 ? savedDiets[0] : null}
         />
       )}
 
