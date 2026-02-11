@@ -19,6 +19,10 @@ import { TrendingUp } from 'lucide-react';
 import { NotificationCenter } from './NotificationCenter';
 import { ProfessorAchievementsGallery } from './ProfessorAchievementsGallery';
 import { ClassManager } from './ClassManager';
+import { PrivacyConsentModal } from './PrivacyConsentModal';
+import { Capacitor } from '@capacitor/core';
+
+const isIOS = Capacitor.getPlatform() === 'ios';
 
 // LISTA FIXA DE EXERCÍCIOS PARA O PERSONAL (SUBSTITUI CHAMADA DE API)
 const FIXED_EXERCISES_LIST = [
@@ -130,6 +134,29 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, onRefreshD
     const [teamSummary, setTeamSummary] = useState<ProfessorSummary | null>(null);
     const [teamActivities, setTeamActivities] = useState<ProfessorActivity[]>([]);
     const [summaryPeriod, setSummaryPeriod] = useState<'day' | 'week' | 'month'>('week');
+
+    // --- AI CONSENT STATE ---
+    const [showPrivacyModal, setShowPrivacyModal] = useState(false);
+    const [pendingAIAction, setPendingAIAction] = useState<() => Promise<void> | void | null>(null);
+
+    const handleAIActionWithConsent = (action: () => Promise<void> | void) => {
+        const hasConsented = localStorage.getItem('AI_CONSENT_ACCEPTED');
+        if (hasConsented === 'true') {
+            action();
+        } else {
+            setPendingAIAction(() => action);
+            setShowPrivacyModal(true);
+        }
+    };
+
+    const confirmPrivacyConsent = () => {
+        localStorage.setItem('AI_CONSENT_ACCEPTED', 'true');
+        setShowPrivacyModal(false);
+        if (pendingAIAction) {
+            pendingAIAction();
+            setPendingAIAction(null);
+        }
+    };
 
 
     // Máscara de telefone brasileiro (10 ou 11 dígitos)
@@ -640,6 +667,10 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, onRefreshD
 
     const handleTeacherGenerateDiet = async (e: React.FormEvent) => {
         e.preventDefault();
+        handleAIActionWithConsent(() => executeTeacherGenerateDiet());
+    };
+
+    const executeTeacherGenerateDiet = async () => {
         if (!selectedUser) return;
         setProcessing(true);
         setProgressMsg(useV2 ? "Gerando Dieta V2 (Estruturada)..." : "Gerando Dieta com IA...");
@@ -720,9 +751,13 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, onRefreshD
 
     const handleTeacherGenerateWorkout = async (e: React.FormEvent) => {
         e.preventDefault();
+        handleAIActionWithConsent(() => executeTeacherGenerateWorkout());
+    };
+
+    const executeTeacherGenerateWorkout = async () => {
         if (!selectedUser) return;
         setProcessing(true);
-        setProgressMsg(useV2 ? "Gerando Treino V2 (Estruturado)..." : "Gerando Treino com IA...");
+        setProgressMsg(useV2 ? "Gerando Treino V2 (Estruturada)..." : "Gerando Treino com IA...");
         try {
             const originalData = {
                 weight: actionFormData.weight,
@@ -790,6 +825,10 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, onRefreshD
     };
 
     const handleTeacherAssessment = async () => {
+        handleAIActionWithConsent(() => executeTeacherAssessment());
+    };
+
+    const executeTeacherAssessment = async () => {
         if (!selectedUser || assessmentFiles.length === 0) return;
 
         // --- VERIFICAÇÃO DE CRÉDITO PARA PERSONAL ---
@@ -2475,7 +2514,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, onRefreshD
                                                     onChange={handleUploadStudentAvatar}
                                                 />
                                             </div>
-                                            {selectedUser.usage && (
+                                            {selectedUser.usage && !isIOS && (
                                                 <div className="text-right">
                                                     <div className="text-xs text-slate-400 font-bold uppercase tracking-wider mb-1">Créditos</div>
                                                     <div className="text-xl font-bold text-white">{selectedUser.credits || 0}</div>
@@ -2590,9 +2629,6 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, onRefreshD
                                                     </button>
                                                     <button onClick={() => setShowResetPasswordModal(true)} className="flex items-center gap-2 px-3 py-2 bg-orange-600 hover:bg-orange-500 text-white rounded-lg text-sm font-medium transition-colors">
                                                         <Key className="w-4 h-4" /> Resetar Senha
-                                                    </button>
-                                                    <button onClick={() => setShowPlanChangeModal(true)} className="flex items-center gap-2 px-3 py-2 bg-purple-600 hover:bg-purple-500 text-white rounded-lg text-sm font-medium transition-colors">
-                                                        <Sparkles className="w-4 h-4" /> Alterar Plano
                                                     </button>
                                                 </div>
                                             </div>
@@ -2868,6 +2904,12 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, onRefreshD
                 onUpdateUser={(updated) => {
                     if (onUpdateUser) onUpdateUser(updated);
                 }}
+            />
+
+            <PrivacyConsentModal
+                isOpen={showPrivacyModal}
+                onClose={() => { setShowPrivacyModal(false); setPendingAIAction(null); }}
+                onConfirm={confirmPrivacyConsent}
             />
         </div >
     );

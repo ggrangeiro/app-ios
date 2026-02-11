@@ -8,6 +8,7 @@ import {
     TrendingUp, Heart, Lightbulb, ChevronRight, Target,
     CheckCircle2, AlertTriangle
 } from 'lucide-react';
+import { PrivacyConsentModal } from './PrivacyConsentModal';
 
 interface MealAnalysisProps {
     isOpen: boolean;
@@ -40,6 +41,29 @@ export const MealAnalysis: React.FC<MealAnalysisProps> = ({
     const [analyzingMsgIndex, setAnalyzingMsgIndex] = useState(0);
     const [scoreAnimated, setScoreAnimated] = useState(0);
     const fileInputRef = useRef<HTMLInputElement>(null);
+
+    // --- AI CONSENT STATE ---
+    const [showPrivacyModal, setShowPrivacyModal] = useState(false);
+    const [pendingAnalysis, setPendingAnalysis] = useState(false);
+
+    const handleAnalyzeWithConsent = () => {
+        const hasConsented = localStorage.getItem('AI_CONSENT_ACCEPTED');
+        if (hasConsented === 'true') {
+            executeAnalyze();
+        } else {
+            setPendingAnalysis(true);
+            setShowPrivacyModal(true);
+        }
+    };
+
+    const confirmPrivacyConsent = () => {
+        localStorage.setItem('AI_CONSENT_ACCEPTED', 'true');
+        setShowPrivacyModal(false);
+        if (pendingAnalysis) {
+            executeAnalyze();
+            setPendingAnalysis(false);
+        }
+    };
 
     // Extrair info da dieta ativa (V2 JSON ou fallback)
     const dietInfo = useMemo(() => {
@@ -103,7 +127,11 @@ export const MealAnalysis: React.FC<MealAnalysisProps> = ({
         setResult(null);
     };
 
-    const handleAnalyze = async () => {
+    const handleAnalyze = () => {
+        handleAnalyzeWithConsent();
+    };
+
+    const executeAnalyze = async () => {
         if (!photoFile) return;
         setAnalyzing(true);
         setAnalyzingMsgIndex(0);
@@ -532,10 +560,10 @@ export const MealAnalysis: React.FC<MealAnalysisProps> = ({
 
                                     {/* AI Verdict */}
                                     <div className={`p-3 rounded-xl flex items-start gap-3 ${result.dietAdherence.mealCaloriesPercentage <= 40
-                                            ? 'bg-emerald-500/10 border border-emerald-500/20'
-                                            : result.dietAdherence.mealCaloriesPercentage <= 60
-                                                ? 'bg-amber-500/10 border border-amber-500/20'
-                                                : 'bg-red-500/10 border border-red-500/20'
+                                        ? 'bg-emerald-500/10 border border-emerald-500/20'
+                                        : result.dietAdherence.mealCaloriesPercentage <= 60
+                                            ? 'bg-amber-500/10 border border-amber-500/20'
+                                            : 'bg-red-500/10 border border-red-500/20'
                                         }`}>
                                         {result.dietAdherence.mealCaloriesPercentage <= 40 ? (
                                             <CheckCircle2 className="w-5 h-5 text-emerald-400 mt-0.5 flex-shrink-0" />
@@ -580,6 +608,12 @@ export const MealAnalysis: React.FC<MealAnalysisProps> = ({
                     )}
                 </div>
             </div>
+
+            <PrivacyConsentModal
+                isOpen={showPrivacyModal}
+                onClose={() => { setShowPrivacyModal(false); setPendingAnalysis(false); }}
+                onConfirm={confirmPrivacyConsent}
+            />
         </div>
     );
 };

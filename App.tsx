@@ -46,6 +46,7 @@ import { ClassSchedule } from './components/ClassSchedule';
 import { MealAnalysis } from './components/MealAnalysis';
 import { useAppState } from './hooks/useAppState';
 import { pendingOperations, PendingOperation } from './utils/pendingOperations';
+import { PrivacyConsentModal } from './components/PrivacyConsentModal';
 
 // --- ICON MAPPING SYSTEM ---
 const EXERCISE_ICONS: Record<string, React.ReactNode> = {
@@ -211,6 +212,10 @@ const App: React.FC = () => {
       return;
     }
 
+    handleAIActionWithConsent(() => executeRedoWorkout(workoutContent, workoutDaysData));
+  };
+
+  const executeRedoWorkout = async (workoutContent: string | null | undefined, workoutDaysData: any) => {
     setGeneratingWorkout(true);
     try {
       let newHtml = '';
@@ -295,6 +300,10 @@ const App: React.FC = () => {
       return;
     }
 
+    handleAIActionWithConsent(() => executeRedoDiet(dietContent, dietDaysData));
+  };
+
+  const executeRedoDiet = async (dietContent: string | null | undefined, dietDaysData: any) => {
     setGeneratingDiet(true);
     try {
       let newHtml = '';
@@ -1296,13 +1305,13 @@ const App: React.FC = () => {
     // personalId might be null, undefined or empty string
     const hasPersonal = !!user.personalId;
 
-    if (isFree && !hasPersonal) {
-      // Small delay to ensure UI transition is smooth
-      setTimeout(() => {
-        setShowPlansModal(true);
-      }, 500);
+    // Startup Modal removed for App Store Compliance
+    /*
+    const isProUser = user.role === 'admin' || user.role === 'personal' || user.role === 'professor';
+    if (isFree && !hasPersonal && !isIOS && !isProUser) {
+       setTimeout(() => setShowPlansModal(true), 500);
     }
-  };
+    */  };
 
   const handleLogout = () => {
     MockDataService.logout();
@@ -1665,9 +1674,40 @@ const App: React.FC = () => {
     }
   };
 
+  // --- AI CONSENT LOGIC FOR APP.TSX ---
+  const [showPrivacyModal, setShowPrivacyModal] = useState(false);
+  const [pendingAIAction, setPendingAIAction] = useState<() => Promise<void> | void | null>(null);
+
+  const handleAIActionWithConsent = (action: () => Promise<void> | void) => {
+    const hasConsented = localStorage.getItem('AI_CONSENT_ACCEPTED');
+    if (hasConsented === 'true') {
+      action();
+    } else {
+      setPendingAIAction(() => action);
+      setShowPrivacyModal(true);
+    }
+  };
+
+  const confirmPrivacyConsent = () => {
+    localStorage.setItem('AI_CONSENT_ACCEPTED', 'true');
+    setShowPrivacyModal(false);
+    if (pendingAIAction) {
+      pendingAIAction();
+      setPendingAIAction(null);
+    }
+  };
+
   const handleGenerateWorkout = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!currentUser) return;
+
+    handleAIActionWithConsent(() => executeGenerateWorkout(e));
+  };
+
+  const executeGenerateWorkout = async (e: React.FormEvent) => {
+    // e.preventDefault() is already called in the wrapper or doesn't matter here if we just run logic
+    // but to be safe we keep it in handle
+
 
     setGeneratingWorkout(true);
     try {
@@ -1753,6 +1793,13 @@ const App: React.FC = () => {
   const handleGenerateDiet = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!currentUser) return;
+
+    handleAIActionWithConsent(() => executeGenerateDiet(e));
+  };
+
+  const executeGenerateDiet = async (e: React.FormEvent) => {
+    // Logic moved here
+
 
     setGeneratingDiet(true);
     try {
@@ -2754,31 +2801,6 @@ const App: React.FC = () => {
                       </button>
 
                       <button
-                        onClick={() => { setShowPlansModal(true); setShowUserMenu(false); }}
-                        className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-slate-700 transition-colors text-left"
-                      >
-                        <div className="p-1.5 bg-gradient-to-br from-purple-500 to-blue-500 rounded-lg text-white">
-                          <Sparkles className="w-4 h-4" />
-                        </div>
-                        <div>
-                          <p className="text-sm font-bold text-white">{t('plans.upgrade_plan')}</p>
-                          <p className="text-[10px] text-slate-400">{t('plans.unlock_features')}</p>
-                        </div>
-                      </button>
-
-                      <button
-                        onClick={() => { setShowBuyCreditsModal(true); setShowUserMenu(false); }}
-                        className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-slate-700 transition-colors text-left"
-                      >
-                        <div className="p-1.5 bg-gradient-to-br from-emerald-500 to-teal-500 rounded-lg text-white">
-                          <Coins className="w-4 h-4" />
-                        </div>
-                        <div>
-                          <p className="text-sm font-bold text-white">{t('credits.my_credits')}</p>
-                          <p className="text-[10px] text-slate-400">{t('credits.recharge_history')}</p>
-                        </div>
-                      </button>
-                      <button
                         onClick={() => { setShowAnamnesisModal(true); setShowUserMenu(false); }}
                         className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-slate-700 transition-colors text-left"
                       >
@@ -3493,6 +3515,7 @@ const App: React.FC = () => {
         currentUser={currentUser}
       />
 
+
       {/* --- OFFLINE BANNER --- */}
       {
         isOffline && (
@@ -3503,6 +3526,12 @@ const App: React.FC = () => {
           </div>
         )
       }
+
+      <PrivacyConsentModal
+        isOpen={showPrivacyModal}
+        onClose={() => { setShowPrivacyModal(false); setPendingAIAction(null); }}
+        onConfirm={confirmPrivacyConsent}
+      />
     </div >
   );
 };
