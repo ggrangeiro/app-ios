@@ -70,7 +70,7 @@
     },
     "workout": {
         "generate_title": "Generate Custom Workout",
-        "generate_button": "Generate Workout with AI (-{{cost}} Credits)",
+        "generate_button": "Generate Workout with AI",
         "generated_success": "Workout generated successfully!",
         "generate_error": "Error generating workout: ",
         "saved_success": "Workout saved successfully!",
@@ -124,7 +124,7 @@
     },
     "diet": {
         "generate_title": "Generate Custom Diet",
-        "generate_button": "Generate Diet with AI (-{{cost}} Credits)",
+        "generate_button": "Generate Diet with AI",
         "generated_success": "Diet generated successfully!",
         "generate_error": "Error generating diet: ",
         "adjusted_success": "Diet adjusted successfully!",
@@ -160,24 +160,6 @@
         "no_workout": "No workout found for check-in.",
         "select_date": "Please select a date for check-in.",
         "make_checkin": "Check In"
-    },
-    "credits": {
-        "1_used": "1 Credit Used",
-        "limit_reached": "Plan limit reached and no credits left.",
-        "subscribe_or_buy": "Subscribe to a plan or buy credits to generate workouts!",
-        "invalid_plan": "Invalid plan.",
-        "starting_payment": "Starting payment...",
-        "subscription_error": "Error starting subscription: ",
-        "your_balance": "Your Balance",
-        "plan": "Plan:",
-        "purchased": "Purchased:",
-        "total": "Total:",
-        "my_credits": "My Credits",
-        "recharge_history": "Recharge & History"
-    },
-    "plans": {
-        "upgrade_plan": "Upgrade Plan",
-        "unlock_features": "Unlock features"
     },
     "analysis": {
         "free_analysis": "Free Analysis",

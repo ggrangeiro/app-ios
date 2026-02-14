@@ -25,16 +25,13 @@ import Login from './components/Login';
 import ResetPassword from './components/ResetPassword';
 import AdminDashboard from './components/AdminDashboard';
 import { NotificationCenter } from './components/NotificationCenter';
-import { Video, UploadCloud, Loader2, ArrowRight, Lightbulb, Sparkles, Smartphone, Zap, LogOut, User as UserIcon, ScanLine, Scale, Image as ImageIcon, AlertTriangle, ShieldCheck, RefreshCcw, X, History, Lock, HelpCircle, Dumbbell, Calendar, Trash2, Printer, ArrowLeft, Utensils, Flame, Shield, Activity, Timer, ChevronDown, CheckCircle2, Coins, Check, Share2, CheckCircle, ThumbsUp, RefreshCw, MessageCircle, Wand2 } from 'lucide-react';
+import { Video, UploadCloud, Loader2, ArrowRight, Lightbulb, Sparkles, Smartphone, Zap, LogOut, User as UserIcon, ScanLine, Scale, Image as ImageIcon, AlertTriangle, ShieldCheck, RefreshCcw, X, History, Lock, HelpCircle, Dumbbell, Calendar, Trash2, Printer, ArrowLeft, Utensils, Flame, Shield, Activity, Timer, ChevronDown, CheckCircle2, Check, Share2, CheckCircle, ThumbsUp, RefreshCw, MessageCircle, Wand2 } from 'lucide-react';
 import { EvolutionModal } from './components/EvolutionModal';
 import { OnboardingGuide } from './components/OnboardingGuide';
 import Toast, { ToastType } from './components/Toast';
 import ConfirmModal from './components/ConfirmModal';
-import BuyCreditsModal from './components/BuyCreditsModal';
 import { WeeklyCheckInTracker } from './components/WeeklyCheckInTracker';
 import LoadingScreen from './components/LoadingScreen';
-import { SubscriptionModal } from './components/SubscriptionModal';
-import { PaymentCallback } from './components/PaymentCallback';
 import { AnamnesisModal } from './components/AnamnesisModal';
 import EvolutionPhotosModal from './components/EvolutionPhotosModal';
 import { AchievementsModal } from './components/AchievementsModal';
@@ -92,7 +89,6 @@ const getExerciseTips = (t: (key: string, options?: any) => any, exerciseKey: st
 };
 
 // Platform detection
-const isIOS = Capacitor.getPlatform() === 'ios';
 
 import { secureStorage } from './utils/secureStorage'; // Import secureStorage
 
@@ -108,11 +104,6 @@ const App: React.FC = () => {
 
   const [step, setStep] = useState<AppStep>(() => {
     try {
-      // Check for Payment Callback URL params first
-      if (window.location.search.includes('collection_status') || window.location.search.includes('status=')) {
-        return AppStep.PAYMENT_CALLBACK;
-      }
-
       // Determina o passo inicial baseada no secureStorage
       const user = secureStorage.getItem<User>('fitai_current_session');
       if (user) {
@@ -139,12 +130,6 @@ const App: React.FC = () => {
   useEffect(() => {
     // Check if user is already logged in on mount and redirect if needed
     if (currentUser && step === AppStep.LOGIN) {
-      // Priority to Payment Callback
-      if (window.location.search.includes('collection_status') || window.location.search.includes('status=')) {
-        setStep(AppStep.PAYMENT_CALLBACK);
-        return;
-      }
-
       const hasSeen = secureStorage.getItem<string>('hasSeenOnboarding_v6');
       if (!hasSeen) {
         setStep(AppStep.ONBOARDING);
@@ -373,8 +358,6 @@ const App: React.FC = () => {
     }
   };
   const [loadingHistory, setLoadingHistory] = useState(false);
-  const [showBuyCreditsModal, setShowBuyCreditsModal] = useState(false);
-  const [showPlansModal, setShowPlansModal] = useState(false);
   const [showAnamnesisModal, setShowAnamnesisModal] = useState(false);
   const [showAchievementsModal, setShowAchievementsModal] = useState(false);
   const [isOffline, setIsOffline] = useState(!window.navigator.onLine);
@@ -396,10 +379,6 @@ const App: React.FC = () => {
           setResetToken(token);
         }
 
-        // Handle deep link callback for payment
-        if (url.searchParams.has('collection_status') || url.searchParams.has('status')) {
-          setStep(AppStep.PAYMENT_CALLBACK);
-        }
       });
     };
     setupDeepLink();
@@ -451,7 +430,6 @@ const App: React.FC = () => {
   const [upgradingWorkout, setUpgradingWorkout] = useState(false); // NEW: Upgrade state
   const [viewingWorkoutHtml, setViewingWorkoutHtml] = useState<string | null>(null);
   const [viewingDaysData, setViewingDaysData] = useState<string | null>(null); // NEW: To handle immediate preview of V2 data
-  const [showPaymentCallback, setShowPaymentCallback] = useState(false);
   const [showDietModal, setShowDietModal] = useState(false);
   const [showGenerateDietForm, setShowGenerateDietForm] = useState(false);
   const [generatingDiet, setGeneratingDiet] = useState(false);
@@ -606,7 +584,7 @@ const App: React.FC = () => {
   };
 
   const handleOpenDietForm = () => {
-    if (!canCreateWorkout(currentUser)) return; // reusing the same credit check
+    if (!canCreateWorkout(currentUser)) return;
 
     if (currentUser?.anamnesis) {
       const { physical, personal } = currentUser.anamnesis;
@@ -690,14 +668,6 @@ const App: React.FC = () => {
         setShowRedoModal(false);
         return;
       }
-      if (showBuyCreditsModal) {
-        setShowBuyCreditsModal(false);
-        return;
-      }
-      if (showPlansModal) {
-        setShowPlansModal(false);
-        return;
-      }
       if (showAnamnesisModal) {
         setShowAnamnesisModal(false);
         return;
@@ -774,18 +744,6 @@ const App: React.FC = () => {
         case AppStep.COMPRESSING:
           // Durante análise/compressão, não permite voltar (previne perda de progresso)
           break;
-        case AppStep.PAYMENT_CALLBACK:
-          // De callback de pagamento, volta para seleção
-          if (currentUser) {
-            if (currentUser.role === 'admin' || currentUser.role === 'personal' || currentUser.role === 'professor') {
-              setStep(AppStep.ADMIN_DASHBOARD);
-            } else {
-              setStep(AppStep.SELECT_EXERCISE);
-            }
-          } else {
-            setStep(AppStep.LOGIN);
-          }
-          break;
         default:
           break;
       }
@@ -798,8 +756,6 @@ const App: React.FC = () => {
     step,
     showEvolutionModal,
     showRedoModal,
-    showBuyCreditsModal,
-    showPlansModal,
     showAnamnesisModal,
     showWorkoutModal,
     showMealAnalysis,
@@ -899,17 +855,6 @@ const App: React.FC = () => {
   }, []);
 
   // --- HELPER FUNCTIONS FOR UI ---
-  // Returns the cost in credits for generating a workout/diet based on user's plan
-  const getGenerationCost = (): number => {
-    const planType = currentUser?.plan?.type?.toUpperCase() || 'FREE';
-    switch (planType) {
-      case 'STUDIO': return 2;
-      case 'PRO': return 3;
-      case 'STARTER': return 4;
-      default: return 5; // FREE or no plan
-    }
-  };
-
   const showToast = (message: string, type: ToastType = 'info') => {
     setToast({ message, type, isVisible: true });
   };
@@ -934,68 +879,13 @@ const App: React.FC = () => {
   const canCreateWorkout = (user: User | null) => {
     if (!user) return false;
 
-    // 0. READONLY check (Absolute Blocker)
+    // READONLY check (Absolute Blocker)
     if (user.accessLevel === 'READONLY') {
       showToast("Seu perfil é apenas de leitura.", 'info');
       return false;
     }
 
-    if (user.role === 'admin' || user.role === 'personal' || user.role === 'professor') return true;
-
-    // Planos Ilimitados
-    if (user.plan?.type === 'PRO' || user.plan?.type === 'STUDIO') return true;
-
-    // Plano Limitado (Starter)
-    if (user.plan?.type === 'STARTER') {
-      const used = user.usage?.generations || 0;
-      const limit = user.usage?.generationsLimit || 10;
-
-      if (used < limit) return true; // Quota available
-
-      // If limit reached, fall through to check credits
-    }
-
-    // Check Credits (Fallback for Free, No Plan, or Exhausted Starter)
-    if (user.credits && user.credits > 0) {
-      return true;
-    }
-
-    // User blocked
-    if (user.plan?.type === 'STARTER') {
-      showToast("Limite do plano atingido e sem créditos.", 'info');
-    } else {
-      showToast("Assine um plano ou compre créditos para gerar treinos!", 'info');
-    }
-
-    setShowPlansModal(true);
-    return false;
-  };
-
-  const handleSubscribe = async (planId: string, planName: string, price: string) => {
-    if (!currentUser) return;
-
-    // Check for valid Plan ID
-    const validPlans = ['STARTER', 'PRO', 'STUDIO'];
-    if (!validPlans.includes(planId)) {
-      showToast("Plano inválido.", 'error');
-      return;
-    }
-
-    try {
-      showToast("Iniciando pagamento...", 'info');
-      const initPointUrl = await apiService.checkoutSubscription(
-        currentUser.id,
-        planId as 'STARTER' | 'PRO' | 'STUDIO'
-      );
-
-      if (initPointUrl) {
-        await Browser.open({ url: initPointUrl });
-        setShowPlansModal(false);
-      }
-    } catch (error: any) {
-      console.error("Erro na assinatura:", error);
-      showToast("Erro ao iniciar assinatura: " + error.message, 'error');
-    }
+    return true;
   };
 
   const handleUpdateUser = (updatedUser: User) => {
@@ -1217,7 +1107,7 @@ const App: React.FC = () => {
     const initData = async () => {
       if (currentUser) {
         // --- ALWAYS REFRESH USER DATA ON MOUNT ---
-        // Ensuring permissions (accessLevel) and credits are up-to-date
+        // Ensuring permissions (accessLevel) are up-to-date
         try {
           // Parallel fetch for speed
           const [fullUser, statusData] = await Promise.all([
@@ -1488,12 +1378,6 @@ const App: React.FC = () => {
   const handleAnalysis = async () => {
     if (!mediaFile || !selectedExercise || !currentUser) return;
 
-    // --- BLOQUEIO PREVENTIVO DE CRÉDITOS ---
-    if (currentUser.role === 'user' && (currentUser.credits === undefined || currentUser.credits <= 0)) {
-      setShowBuyCreditsModal(true);
-      return;
-    }
-
     const exerciseObj = exercisesList.find(e => e.id === selectedExercise);
     let aiContextName = selectedExercise;
     let backendId = selectedExercise;
@@ -1606,27 +1490,15 @@ const App: React.FC = () => {
         return;
       }
 
-      // --- CONSUMIR CRÉDITO (SE FOR ALUNO E SUCESSO) ---
       if (currentUser.role === 'user') {
         try {
-          // Determinar Nome Amigável
           let analysisFriendlyName = backendId;
           if (backendId === SPECIAL_EXERCISES.FREE_MODE) analysisFriendlyName = "Análise Livre";
           else if (backendId === SPECIAL_EXERCISES.POSTURE) analysisFriendlyName = "Avaliação Postural";
           else if (backendId === SPECIAL_EXERCISES.BODY_COMPOSITION) analysisFriendlyName = "Composição Corporal";
 
-          const creditResponse = await apiService.consumeCredit(currentUser.id, 'ANALISE', analysisFriendlyName);
-          if (creditResponse && typeof creditResponse.novoSaldo === 'number') {
-            handleUpdateUser({ ...currentUser, credits: creditResponse.novoSaldo });
-          }
+          await apiService.consumeCredit(currentUser.id, 'ANALISE', analysisFriendlyName);
         } catch (e: any) {
-          if (e.message === 'CREDITS_EXHAUSTED' || e.message.includes('402')) {
-            setShowBuyCreditsModal(true);
-            // Opcional: Se quiser impedir de mostrar o resultado se falhar a cobrança, descomente:
-            // setStep(AppStep.UPLOAD_VIDEO);
-            // return;
-          }
-          // throw e; // Repassa outros erros se necessário, mas aqui deixamos continuar para mostrar o resultado já obtido
         }
       }
 
@@ -1746,24 +1618,8 @@ const App: React.FC = () => {
         }
       }
 
-      // CONSUME CREDIT LOGIC
-      const isUnlimited = currentUser.role === 'admin' || currentUser.role === 'personal' || currentUser.role === 'professor'
-        || currentUser.plan?.type === 'PRO' || currentUser.plan?.type === 'STUDIO';
-
-      const isStarterQuota = currentUser.plan?.type === 'STARTER' && (currentUser.usage?.generations || 0) < (currentUser.usage?.generationsLimit || 10);
-
-      if (!isUnlimited && !isStarterQuota) {
-        try {
-          await apiService.consumeCredit(currentUser.id, 'TREINO');
-          showToast(t('credits.1_used'), 'info');
-        } catch (e) {
-          console.error("Erro ao consumir crédito", e);
-          // Non-blocking? User already got the content. 
-          // Ideally we charge before, but here we prioritize UX flow.
-        }
-
-        // Force refresh credits on success to update UI
-        handleRefreshUser();
+      if (currentUser.role === 'user') {
+        try { await apiService.consumeCredit(currentUser.id, 'TREINO'); } catch (e) { }
       }
 
       await fetchUserWorkouts(currentUser.id);
@@ -1837,22 +1693,8 @@ const App: React.FC = () => {
       // Usa apiService para criar e refresh
       await apiService.createDiet(currentUser.id, planHtml, dietFormData.goal);
 
-      // CONSUME CREDIT LOGIC
-      const isUnlimited = currentUser.role === 'admin' || currentUser.role === 'personal' || currentUser.role === 'professor'
-        || currentUser.plan?.type === 'PRO' || currentUser.plan?.type === 'STUDIO';
-
-      const isStarterQuota = currentUser.plan?.type === 'STARTER' && (currentUser.usage?.generations || 0) < (currentUser.usage?.generationsLimit || 10);
-
-      if (!isUnlimited && !isStarterQuota) {
-        try {
-          await apiService.consumeCredit(currentUser.id, 'DIETA');
-          showToast(t('credits.1_used'), 'info');
-        } catch (e) {
-          console.error("Erro ao consumir crédito", e);
-        }
-
-        // Force refresh credits on success to update UI
-        handleRefreshUser();
+      if (currentUser.role === 'user') {
+        try { await apiService.consumeCredit(currentUser.id, 'DIETA'); } catch (e) { }
       }
 
       await fetchUserDiets(currentUser.id);
@@ -2032,21 +1874,6 @@ const App: React.FC = () => {
       <Login
         onLogin={handleLogin}
         showToast={showToast}
-        onViewPlans={async () => {
-          const url = 'https://fitanalizer.com.br/planos';
-          try {
-            console.log('Attempting to open via Capacitor Browser...');
-            await Browser.open({ url, windowName: '_system' });
-          } catch (e) {
-            console.warn('Browser.open failed, trying window.open fallback:', e);
-            try {
-              window.open(url, '_system', 'noopener,noreferrer');
-            } catch (fallbackError) {
-              console.error('All open methods failed:', fallbackError);
-              showToast('Não foi possível abrir o link. Acesse: fitanalizer.com.br/planos', 'error');
-            }
-          }
-        }}
       />
       <Toast message={toast.message} type={toast.type} isVisible={toast.isVisible} onClose={closeToast} />
     </>
@@ -2054,33 +1881,6 @@ const App: React.FC = () => {
 
   if (step === AppStep.ONBOARDING) return (
     <OnboardingGuide onClose={handleOnboardingComplete} />
-  );
-
-  const getPaymentStatus = (): 'success' | 'failure' | 'pending' => {
-    const params = new URLSearchParams(window.location.search);
-    // Mercado Pago returns 'collection_status' or 'status'
-    const status = params.get('collection_status') || params.get('status');
-
-    if (status === 'approved' || status === 'success') return 'success';
-    if (status === 'pending' || status === 'in_process') return 'pending';
-    return 'failure';
-  };
-
-  if (step === AppStep.PAYMENT_CALLBACK) return (
-    <PaymentCallback
-      status={getPaymentStatus()}
-      currentUser={currentUser}
-      refreshUser={handleRefreshUser}
-      onContinue={() => {
-        // Limpa a URL
-        window.history.replaceState({}, document.title, window.location.pathname);
-        if (currentUser) {
-          setStep(AppStep.SELECT_EXERCISE);
-        } else {
-          setStep(AppStep.LOGIN);
-        }
-      }}
-    />
   );
 
   const renderWorkoutModal = () => (
@@ -2548,7 +2348,7 @@ const App: React.FC = () => {
             </div>
           </div>
 
-          <button type="submit" disabled={generatingWorkout} className="w-full bg-blue-600 hover:bg-blue-500 text-white font-bold py-3 rounded-xl transition-all">{generatingWorkout ? <Loader2 className="animate-spin mx-auto" /> : (currentUser?.role === 'admin' ? 'Gerar Treino com IA' : `Gerar Treino com IA (-${getGenerationCost()} Créditos)`)}</button>
+          <button type="submit" disabled={generatingWorkout} className="w-full bg-blue-600 hover:bg-blue-500 text-white font-bold py-3 rounded-xl transition-all">{generatingWorkout ? <Loader2 className="animate-spin mx-auto" /> : 'Gerar Treino com IA'}</button>
         </form>
       </div>
     </div>
@@ -2622,7 +2422,7 @@ const App: React.FC = () => {
             </div>
           </div>
 
-          <button type="submit" disabled={generatingDiet} className="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-3 rounded-xl transition-all">{generatingDiet ? <Loader2 className="animate-spin mx-auto" /> : (currentUser?.role === 'admin' ? 'Gerar Dieta com IA' : `Gerar Dieta com IA (-${getGenerationCost()} Créditos)`)}</button>
+          <button type="submit" disabled={generatingDiet} className="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-3 rounded-xl transition-all">{generatingDiet ? <Loader2 className="animate-spin mx-auto" /> : 'Gerar Dieta com IA'}</button>
         </form>
       </div>
     </div>
@@ -2638,11 +2438,6 @@ const App: React.FC = () => {
         onConfirm={confirmModal.onConfirm}
         onCancel={() => setConfirmModal(prev => ({ ...prev, isOpen: false }))}
         isDestructive={confirmModal.isDestructive}
-      />
-      <BuyCreditsModal
-        isOpen={showBuyCreditsModal}
-        onClose={() => setShowBuyCreditsModal(false)}
-        currentUser={currentUser}
       />
 
       <header className="sticky top-0 z-50 glass-panel border-b-0" style={{ paddingTop: 'max(35px, env(safe-area-inset-top))' }}>
@@ -2690,40 +2485,6 @@ const App: React.FC = () => {
               >
                 <RefreshCw className="w-4 h-4" />
               </button>
-            )}
-            {currentUser && (currentUser.role === 'user' || currentUser.role === 'personal') && (
-              <div
-                className="relative group cursor-help"
-              >
-                <button
-                  onClick={() => setShowBuyCreditsModal(true)}
-                  className="flex items-center gap-2 px-3 py-1.5 bg-slate-800/80 hover:bg-slate-700 rounded-full border border-yellow-500/30 transition-all"
-                >
-                  <Coins className="w-4 h-4 text-yellow-400 group-hover:scale-110 transition-transform" />
-                  <span className="text-sm font-bold text-yellow-100">{currentUser.credits ?? 0}</span>
-                </button>
-
-                {/* Desktop Tooltip */}
-                {currentUser.usage && (
-                  <div className="hidden md:block absolute top-full right-0 mt-2 p-3 bg-slate-800 border border-slate-700 rounded-xl shadow-xl w-48 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none group-hover:pointer-events-auto z-50">
-                    <p className="text-xs text-slate-400 mb-2 font-bold uppercase tracking-wider border-b border-slate-700 pb-1">Seu Saldo</p>
-                    <div className="space-y-1">
-                      <div className="flex justify-between text-xs">
-                        <span className="text-slate-400">Plano:</span>
-                        <span className="text-white font-medium">{currentUser.usage.subscriptionCredits || 0}</span>
-                      </div>
-                      <div className="flex justify-between text-xs">
-                        <span className="text-slate-400">Comprados:</span>
-                        <span className="text-emerald-400 font-medium">+{currentUser.usage.purchasedCredits || 0}</span>
-                      </div>
-                      <div className="border-t border-slate-700 my-1 pt-1 flex justify-between text-xs font-bold">
-                        <span className="text-slate-300">Total:</span>
-                        <span className="text-yellow-400">{currentUser.credits || 0}</span>
-                      </div>
-                    </div>
-                  </div>
-                )}
-              </div>
             )}
             {/* USER DROPDOWN & INTERACTION AREA */}
             <div className="relative">
@@ -3508,11 +3269,6 @@ const App: React.FC = () => {
         />
       )}
 
-      < SubscriptionModal
-        isOpen={showPlansModal}
-        onClose={() => setShowPlansModal(false)}
-        currentUser={currentUser}
-      />
 
 
       {/* --- OFFLINE BANNER --- */}

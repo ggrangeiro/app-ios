@@ -149,7 +149,7 @@ export const apiService = {
         };
     },
 
-    // --- STATUS / PLAN / CREDITS REFRESH ---
+    // --- STATUS ---
     getUserStatus: async (userId: string | number): Promise<Partial<User>> => {
         const data = await nativeFetch({
             method: 'GET',
@@ -305,7 +305,6 @@ export const apiService = {
         return await response.json();
     },
 
-    // --- CRÉDITOS ---
     consumeCredit: async (targetUserId: string | number, reason: 'ANALISE' | 'TREINO' | 'DIETA', analysisType?: string) => {
         const params: any = getAuthQueryParams();
         params.reason = reason;
@@ -721,60 +720,6 @@ export const apiService = {
             method: 'DELETE',
             url: `${API_BASE_URL}/api/usuarios/${userId}`,
             params: getAuthQueryParams()
-        });
-    },
-
-    // --- Integração Mercado Pago (Web Checkout) ---
-    checkoutCredits: async (userId: string | number, creditsAmount: number) => {
-        const response = await nativeFetch({
-            method: 'POST',
-            url: `${API_BASE_URL}/api/checkout/create-preference/credits`,
-            params: { userId: String(userId) },
-            data: { amount: creditsAmount }
-        });
-
-        // Retorna a URL de pagamento (initPoint ou sandboxInitPoint)
-        const initPoint = response.initPoint || response.sandboxInitPoint;
-        if (!initPoint) throw new Error("URL de pagamento não recebida do servidor.");
-
-        return initPoint;
-    },
-
-    checkoutSubscription: async (userId: string | number, planId: 'STARTER' | 'PRO' | 'STUDIO') => {
-        const response = await nativeFetch({
-            method: 'POST',
-            url: `${API_BASE_URL}/api/checkout/create-preference`,
-            params: { userId: String(userId) },
-            data: { planId }
-        });
-
-        const initPoint = response.initPoint || response.sandboxInitPoint;
-        if (!initPoint) throw new Error("URL de pagamento não recebida do servidor.");
-
-        return initPoint;
-    },
-
-    getPlans: async () => {
-        return await nativeFetch({
-            method: 'GET',
-            url: `${API_BASE_URL}/api/plans`
-        });
-    },
-
-    subscribe: async (userId: string | number, planId: string) => {
-        return await nativeFetch({
-            method: 'POST',
-            url: `${API_BASE_URL}/api/subscriptions/subscribe`,
-            params: { userId: String(userId) },
-            data: { planId }
-        });
-    },
-
-    cancelSubscription: async (userId: string | number) => {
-        return await nativeFetch({
-            method: 'POST',
-            url: `${API_BASE_URL}/api/subscriptions/cancel`,
-            params: { userId: String(userId) }
         });
     },
 

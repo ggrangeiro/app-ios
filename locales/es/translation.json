@@ -70,7 +70,7 @@
     },
     "workout": {
         "generate_title": "Generar Entrenamiento Personalizado",
-        "generate_button": "Generar Entrenamiento con IA (-{{cost}} Créditos)",
+        "generate_button": "Generar Entrenamiento con IA",
         "generated_success": "¡Entrenamiento generado con éxito!",
         "generate_error": "Error al generar entrenamiento: ",
         "saved_success": "¡Entrenamiento guardado con éxito!",
@@ -124,7 +124,7 @@
     },
     "diet": {
         "generate_title": "Generar Dieta Personalizada",
-        "generate_button": "Generar Dieta con IA (-{{cost}} Créditos)",
+        "generate_button": "Generar Dieta con IA",
         "generated_success": "¡Dieta generada con éxito!",
         "generate_error": "Error al generar dieta: ",
         "adjusted_success": "¡Dieta ajustada con éxito!",
@@ -160,24 +160,6 @@
         "no_workout": "No se encontró entrenamiento para check-in.",
         "select_date": "Selecciona una fecha para el check-in.",
         "make_checkin": "Hacer Check-in"
-    },
-    "credits": {
-        "1_used": "1 Crédito Utilizado",
-        "limit_reached": "Límite del plan alcanzado y sin créditos.",
-        "subscribe_or_buy": "¡Suscríbete a un plan o compra créditos para generar entrenamientos!",
-        "invalid_plan": "Plan inválido.",
-        "starting_payment": "Iniciando pago...",
-        "subscription_error": "Error al iniciar suscripción: ",
-        "your_balance": "Tu Saldo",
-        "plan": "Plan:",
-        "purchased": "Comprados:",
-        "total": "Total:",
-        "my_credits": "Mis Créditos",
-        "recharge_history": "Recarga e Historial"
-    },
-    "plans": {
-        "upgrade_plan": "Mejorar Plan",
-        "unlock_features": "Desbloquea funciones"
     },
     "analysis": {
         "free_analysis": "Análisis Libre",

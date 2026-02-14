@@ -96,7 +96,6 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, onRefreshD
 
     // Modals
     const [showEvolutionModal, setShowEvolutionModal] = useState(false);
-    const [showPlansModal, setShowPlansModal] = useState(false);
     const [showAnamnesisModal, setShowAnamnesisModal] = useState(false);
     const [showRedoModal, setShowRedoModal] = useState(false);
 
@@ -257,11 +256,6 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, onRefreshD
     const [showResetPasswordModal, setShowResetPasswordModal] = useState(false);
     const [resetPasswordValue, setResetPasswordValue] = useState('');
     const [resetPasswordLoading, setResetPasswordLoading] = useState(false);
-
-    // Plan Change States
-    const [showPlanChangeModal, setShowPlanChangeModal] = useState(false);
-    const [selectedPlanId, setSelectedPlanId] = useState<string>('');
-    const [planChangeLoading, setPlanChangeLoading] = useState(false);
 
     const [toast, setToast] = useState<{ message: string; type: ToastType; isVisible: boolean }>({
         message: '', type: 'info', isVisible: false
@@ -831,14 +825,6 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, onRefreshD
     const executeTeacherAssessment = async () => {
         if (!selectedUser || assessmentFiles.length === 0) return;
 
-        // --- VERIFICAÇÃO DE CRÉDITO PARA PERSONAL ---
-        if (currentUser.role !== 'admin') {
-            if (currentUser.credits !== undefined && currentUser.credits <= 0) {
-                showToast("Créditos insuficientes. Recarregue para continuar.", 'error');
-                return;
-            }
-        }
-
         setProcessing(true);
         setProgressMsg("Analisando vídeo/imagem com IA...");
 
@@ -858,32 +844,14 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, onRefreshD
             // Agora passamos o array de arquivos
             const result = await analyzeVideo(finalFiles, finalType, currentUser.id, currentUser.role);
 
-            // --- 1. CONSUMIR CRÉDITO (MOVED TO AFTER SUCCESS) ---
             if (currentUser.role !== 'admin') {
                 try {
-                    // Determinar Nome Amigável
                     let analysisFriendlyName = finalType;
                     if (finalType === SPECIAL_EXERCISES.FREE_MODE) analysisFriendlyName = "Análise Livre";
                     else if (finalType === SPECIAL_EXERCISES.POSTURE) analysisFriendlyName = "Avaliação Postural";
                     else if (finalType === SPECIAL_EXERCISES.BODY_COMPOSITION) analysisFriendlyName = "Composição Corporal";
-
-                    const creditResponse = await apiService.consumeCredit(currentUser.id, 'ANALISE', analysisFriendlyName);
-                    if (creditResponse && typeof creditResponse.novoSaldo === 'number') {
-                        if (onUpdateUser) {
-                            onUpdateUser({ ...currentUser, credits: creditResponse.novoSaldo });
-                        }
-                    }
-                } catch (e: any) {
-                    if (e.message === 'CREDITS_EXHAUSTED' || e.message.includes('402')) {
-                        showToast("Saldo insuficiente para realizar a análise.", 'error');
-                        // Optional: decide if you want to stop here or show result anyway.
-                        // Usually if IA already processed, we might want to show it, but blocking future requests.
-                        // For now, let's allow showing since it's already processed.
-                    } else {
-                        // Log error but continue
-                        console.error("Erro ao debitar crédito", e);
-                    }
-                }
+                    await apiService.consumeCredit(currentUser.id, 'ANALISE', analysisFriendlyName);
+                } catch (e: any) { }
             }
 
             // --- UPLOAD DE EVIDÊNCIA PARA ANÁLISES ESPECIAIS (Postura/Composição Corporal) ---
@@ -1114,26 +1082,6 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, onRefreshD
         }
     };
 
-    const handleChangePlan = async () => {
-        if (!selectedUser || !selectedPlanId) return;
-
-        setPlanChangeLoading(true);
-        try {
-            await apiService.subscribe(selectedUser.id, selectedPlanId);
-            showToast(`Plano de ${selectedUser.name} alterado para ${selectedPlanId}!`, 'success');
-            setShowPlanChangeModal(false);
-            setSelectedPlanId('');
-            // Refresh user data (would ideally call getMe but we'll refetch users list)
-            await fetchBackendUsers();
-            // Re-select the user to show updated data
-            // This is a simplification; a full implementation would update the selected user object directly
-        } catch (err: any) {
-            showToast('Erro ao alterar plano: ' + err.message, 'error');
-        } finally {
-            setPlanChangeLoading(false);
-        }
-    };
-
     const getScoreColor = (score: number) => {
         if (score >= 80) return "text-emerald-400 border-emerald-500/30 bg-emerald-500/10";
         if (score >= 60) return "text-yellow-400 border-yellow-500/30 bg-yellow-500/10";
@@ -1225,73 +1173,6 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, onRefreshD
                                 )}
                             </button>
                         </div>
-                    </div>
-                </div>
-            )}
-
-            {/* PLAN CHANGE MODAL */}
-            {showPlanChangeModal && selectedUser && (
-                <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-in fade-in">
-                    <div className="bg-slate-900 border border-slate-700 rounded-3xl p-6 md:p-8 w-full max-w-md relative shadow-2xl">
-                        <button
-                            onClick={() => { setShowPlanChangeModal(false); setSelectedPlanId(''); }}
-                            className="absolute top-4 right-4 text-slate-400 hover:text-white transition-colors"
-                        >
-                            <X className="w-6 h-6" />
-                        </button>
-
-                        <div className="text-center mb-6">
-                            <div className="flex justify-center mb-3">
-                                <div className="p-3 bg-purple-600/20 rounded-2xl">
-                                    <Sparkles className="w-8 h-8 text-purple-400" />
-                                </div>
-                            </div>
-                            <h3 className="text-xl font-bold text-white mb-1">Alterar Plano</h3>
-                            <p className="text-slate-400 text-sm">
-                                Alterando plano de <span className="text-white font-semibold">{selectedUser.name}</span>
-                            </p>
-                        </div>
-
-                        <div className="space-y-3 mb-6">
-                            {['FREE', 'STARTER', 'PRO', 'STUDIO'].map((plan) => (
-                                <button
-                                    key={plan}
-                                    onClick={() => setSelectedPlanId(plan)}
-                                    className={`w-full p-4 rounded-xl border-2 transition-all flex items-center justify-between ${selectedPlanId === plan
-                                        ? 'border-purple-500 bg-purple-500/10'
-                                        : 'border-slate-700 bg-slate-800/50 hover:border-slate-600'
-                                        }`}
-                                >
-                                    <div className="flex items-center gap-3">
-                                        <span className="text-white font-bold">{plan}</span>
-                                        {plan === 'PRO' && (
-                                            <span className="text-[10px] bg-amber-500 text-white px-2 py-0.5 rounded-full font-bold">
-                                                POPULAR
-                                            </span>
-                                        )}
-                                    </div>
-                                    {selectedPlanId === plan && <Check className="w-5 h-5 text-purple-400" />}
-                                </button>
-                            ))}
-                        </div>
-
-                        <button
-                            onClick={handleChangePlan}
-                            disabled={planChangeLoading || !selectedPlanId}
-                            className="w-full py-3.5 bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-500 hover:to-blue-500 text-white font-bold rounded-xl transition-all shadow-lg flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
-                        >
-                            {planChangeLoading ? (
-                                <>
-                                    <Loader2 className="w-5 h-5 animate-spin" />
-                                    Alterando...
-                                </>
-                            ) : (
-                                <>
-                                    <Check className="w-5 h-5" />
-                                    Confirmar Alteração
-                                </>
-                            )}
-                        </button>
                     </div>
                 </div>
             )}
@@ -2514,15 +2395,6 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, onRefreshD
                                                     onChange={handleUploadStudentAvatar}
                                                 />
                                             </div>
-                                            {selectedUser.usage && !isIOS && (
-                                                <div className="text-right">
-                                                    <div className="text-xs text-slate-400 font-bold uppercase tracking-wider mb-1">Créditos</div>
-                                                    <div className="text-xl font-bold text-white">{selectedUser.credits || 0}</div>
-                                                    <div className="text-[10px] text-slate-500">
-                                                        <span className="text-slate-400">{selectedUser.usage.subscriptionCredits}</span> Plano + <span className="text-emerald-400">{selectedUser.usage.purchasedCredits}</span> Extras
-                                                    </div>
-                                                </div>
-                                            )}
                                         </div>
 
                                         {/* FEEDBACK STATS & CONTACT */}

@@ -91,8 +91,7 @@ export enum AppStep {
   COMPRESSING = 'COMPRESSING',
   ANALYZING = 'ANALYZING',
   RESULTS = 'RESULTS',
-  ONBOARDING = 'ONBOARDING',
-  PAYMENT_CALLBACK = 'PAYMENT_CALLBACK'
+  ONBOARDING = 'ONBOARDING'
 }
 
 export type UserRole = 'admin' | 'user' | 'personal' | 'professor';

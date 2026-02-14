@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { User } from '../types';
 import { apiService } from '../services/apiService';
 import { secureStorage } from '../utils/secureStorage';
-import { Dumbbell, ArrowRight, Lock, Mail, User as UserIcon, Phone, X, CheckCircle, Loader2, Medal, Crown, MessageCircle, Eye, EyeOff } from 'lucide-react';
+import { Dumbbell, ArrowRight, Lock, Mail, User as UserIcon, Phone, X, CheckCircle, Loader2, Medal, MessageCircle, Eye, EyeOff } from 'lucide-react';
 import { ToastType } from './Toast';
 import { Capacitor } from '@capacitor/core';
 
@@ -11,10 +11,9 @@ const isIOS = Capacitor.getPlatform() === 'ios';
 interface LoginProps {
   onLogin: (user: User) => void;
   showToast: (message: string, type: ToastType) => void;
-  onViewPlans?: () => void;
 }
 
-const Login: React.FC<LoginProps> = ({ onLogin, showToast, onViewPlans }) => {
+const Login: React.FC<LoginProps> = ({ onLogin, showToast }) => {
   const [isRegistering, setIsRegistering] = useState(false);
   const [role, setRole] = useState<'user' | 'personal'>('user');
   const [email, setEmail] = useState('');
@@ -137,29 +136,6 @@ const Login: React.FC<LoginProps> = ({ onLogin, showToast, onViewPlans }) => {
 
   return (
     <div className="min-h-screen flex items-center justify-center p-4">
-      {/* Button moved outside glass-panel for guaranteed z-index interaction */}
-      {/* Hide on iOS to avoid App Store rejection for payment-related UI */}
-      {!isIOS && onViewPlans && (
-        <button
-          type="button"
-          onClick={(e) => {
-            e.preventDefault();
-            e.stopPropagation();
-            console.log('Ver Planos Clicked (Root)');
-            if (onViewPlans) onViewPlans();
-          }}
-          onTouchEnd={(e) => {
-            e.preventDefault();
-            e.stopPropagation();
-            console.log('Ver Planos Touched (Root)');
-            if (onViewPlans) onViewPlans();
-          }}
-          className="fixed top-12 right-6 z-[9999] text-xs text-blue-400 hover:text-blue-300 transition-colors flex items-center gap-1 border border-blue-500/30 px-4 py-2 rounded-full hover:bg-blue-500/10 cursor-pointer bg-slate-900/80 backdrop-blur-md shadow-lg active:scale-95 touch-manipulation"
-        >
-          <Crown className="w-4 h-4" /> <span className="font-bold">Ver Planos</span>
-        </button>
-      )}
-
       <div className="glass-panel w-full max-w-md p-8 rounded-3xl animate-fade-in relative overflow-hidden transition-all duration-500">
 
         <div className="absolute top-0 right-0 p-10 opacity-10 pointer-events-none">

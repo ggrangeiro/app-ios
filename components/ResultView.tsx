@@ -113,14 +113,13 @@ interface ResultViewProps {
   exercise: ExerciseType;
   history: ExerciseRecord[];
   userId: string;
-  currentUser?: User | null; // Adicionado para controle de créditos
+  currentUser?: User | null;
   onReset: () => void;
   onSave?: () => void;
   onDeleteRecord?: (recordId: string) => void;
   onWorkoutSaved?: () => void;
   onDietSaved?: () => void;
-  onUpdateUser?: (user: User) => void; // Adicionado para atualizar créditos
-  onBuyCredits?: () => void; // Adicionado para abrir modal de compra
+  onUpdateUser?: (user: User) => void;
   isHistoricalView?: boolean;
   showToast?: (message: string, type: ToastType) => void;
   triggerConfirm?: (title: string, message: string, onConfirm: () => void, isDestructive?: boolean) => void;
@@ -138,7 +137,6 @@ export const ResultView: React.FC<ResultViewProps> = ({
   onWorkoutSaved,
   onDietSaved,
   onUpdateUser,
-  onBuyCredits,
   isHistoricalView = false,
   showToast = (msg: string, type: ToastType) => { },
   triggerConfirm = (title: string, message: string, onConfirm: () => void, isDestructive?: boolean) => { }
@@ -242,18 +240,6 @@ export const ResultView: React.FC<ResultViewProps> = ({
   const handleGenerateDiet = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    // --- VERIFICAÇÃO DE CRÉDITO ---
-    if (currentUser && (currentUser.role === 'user' || currentUser.role === 'personal')) {
-      if (currentUser.credits !== undefined && currentUser.credits <= 0) {
-        if (onBuyCredits) {
-          onBuyCredits();
-        } else {
-          showToast("Créditos insuficientes.", 'error');
-        }
-        return;
-      }
-    }
-
     setDietLoading(true);
     try {
       const planHtml = await generateDietPlan(dietFormData, currentUser?.id || userId, currentUser?.role || 'user', dietDocument, dietPhoto);
@@ -261,19 +247,8 @@ export const ResultView: React.FC<ResultViewProps> = ({
       await apiService.createDiet(userId, planHtml, dietFormData.goal);
       if (onDietSaved) onDietSaved();
 
-      // --- DEBITAR CRÉDITO ---
-      if (currentUser && (currentUser.role === 'user' || currentUser.role === 'personal')) {
-        try {
-          const creditResponse = await apiService.consumeCredit(currentUser.id, 'DIETA');
-          if (creditResponse && typeof creditResponse.novoSaldo === 'number' && onUpdateUser) {
-            onUpdateUser({ ...currentUser, credits: creditResponse.novoSaldo });
-          }
-        } catch (e: any) {
-          console.error("Erro ao debitar crédito da dieta", e);
-          if (e.message === 'CREDITS_EXHAUSTED' || e.message.includes('402')) {
-            showToast("Atenção: Saldo insuficiente para debitar a geração.", 'error');
-          }
-        }
+      if (currentUser && currentUser.role === 'user') {
+        try { await apiService.consumeCredit(currentUser.id, 'DIETA'); } catch (e: any) { }
       }
 
       // Limpa anexos
@@ -295,18 +270,6 @@ export const ResultView: React.FC<ResultViewProps> = ({
 
   const handleGenerateWorkout = async (e: React.FormEvent) => {
     e.preventDefault();
-
-    // --- VERIFICAÇÃO DE CRÉDITO ---
-    if (currentUser && (currentUser.role === 'user' || currentUser.role === 'personal')) {
-      if (currentUser.credits !== undefined && currentUser.credits <= 0) {
-        if (onBuyCredits) {
-          onBuyCredits();
-        } else {
-          showToast("Créditos insuficientes.", 'error');
-        }
-        return;
-      }
-    }
 
     setWorkoutLoading(true);
     try {
@@ -345,19 +308,8 @@ export const ResultView: React.FC<ResultViewProps> = ({
 
       if (onWorkoutSaved) onWorkoutSaved();
 
-      // --- DEBITAR CRÉDITO ---
-      if (currentUser && (currentUser.role === 'user' || currentUser.role === 'personal')) {
-        try {
-          const creditResponse = await apiService.consumeCredit(currentUser.id, 'TREINO');
-          if (creditResponse && typeof creditResponse.novoSaldo === 'number' && onUpdateUser) {
-            onUpdateUser({ ...currentUser, credits: creditResponse.novoSaldo });
-          }
-        } catch (e: any) {
-          console.error("Erro ao debitar crédito do treino", e);
-          if (e.message === 'CREDITS_EXHAUSTED' || e.message.includes('402')) {
-            showToast("Atenção: Saldo insuficiente para debitar a geração.", 'error');
-          }
-        }
+      if (currentUser && currentUser.role === 'user') {
+        try { await apiService.consumeCredit(currentUser.id, 'TREINO'); } catch (e: any) { }
       }
 
       // Limpa anexos
@@ -760,7 +712,7 @@ ${strengthsText}${improvementsText}
               </fieldset>
               <button type="submit" disabled={dietLoading} className="w-full mt-4 bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-4 rounded-xl shadow-lg transition-all flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed">
                 {dietLoading ? <Loader2 className="w-5 h-5 animate-spin" /> : <Sparkles className="w-5 h-5" />}
-                {dietLoading ? "Gerando..." : (currentUser?.role === 'admin' ? "Gerar Dieta" : "Gerar Dieta (1 Crédito)")}
+                {dietLoading ? "Gerando..." : "Gerar Dieta"}
               </button>
             </form>
           </div>
@@ -951,7 +903,7 @@ ${strengthsText}${improvementsText}
 
               <button type="submit" disabled={workoutLoading} className="w-full mt-4 bg-blue-600 hover:bg-blue-500 text-white font-bold py-4 rounded-xl shadow-lg transition-all flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed">
                 {workoutLoading ? <Loader2 className="w-5 h-5 animate-spin" /> : <Sparkles className="w-5 h-5" />}
-                {workoutLoading ? "Gerando..." : (currentUser?.role === 'admin' ? "Gerar Treino" : "Gerar Treino (1 Crédito)")}
+                {workoutLoading ? "Gerando..." : "Gerar Treino"}
               </button>
             </form>
           </div>
